@@ -1,88 +1,98 @@
 # BR TalentHub · 招聘会简历收集系统
 
-第一版（MVP）：招聘会现场用电脑大屏展示二维码，求职者手机扫码上传简历，文件直接落盘到本地指定文件夹。支持**局域网**和**公网（Cloudflare 快速隧道）**两种模式，公网模式手机在任何网络扫码都能上传。
+**两个分支，两种部署模式：**
 
-## 快速开始
+| 分支 | 模式 | 特点 |
+|---|---|---|
+| **`p2p`**（本分支） | WebRTC P2P 直传 | 手机 ↔ 电脑浏览器点对点直传，**文件不经过任何服务器**，可离线，隐私最好 |
+| **`cloudflare`** | HTTP + Cloudflare 隧道 | 手机 → Cloudflare → 电脑，公网可访问，简历仍落本地 |
 
-### 局域网模式（现场同 Wi-Fi）
+切换到另一分支：`git checkout cloudflare`
 
-双击 `run.bat`，首次运行会自动创建虚拟环境（venv）并安装依赖，然后启动服务。
+---
 
-- 管理端大屏：<http://localhost:8000>
-- 手机上传页：<http://localhost:8000/upload>
+## P2P 模式（本分支）
 
-### 公网模式（手机不连现场 Wi-Fi 也能传）
+**Windows 电脑 + 手机浏览器 + 二维码 + WebRTC P2P + 本地文件夹**
 
-双击 `run_online.bat`，脚本会自动：启动本地服务 → 启动 Cloudflare 快速隧道 → 拿到公网地址 `https://xxx.trycloudflare.com` → 写入配置。
+### 架构
 
-- 公网地址自动填入管理页，二维码直接指向公网链接
-- 求职者任何网络扫码即可上传，简历仍落本地文件夹
-- **链接每次重启会变**，招聘会当天重新跑一次脚本即可
-- 已生成一张二维码图片：`data/qrcode_online.png`，可打印或发群
+```
+招聘会电脑（管理端大屏）
+      │  生成二维码
+      ▼
+   手机扫码
+      │
+      ▼
+手机浏览器 ──(WebRTC DataChannel 文件直传)──► 电脑浏览器
+                                                    │ 本地落盘
+                                                    ▼
+                                          D:\招聘会\2026-08\张三_简历.pdf
+```
 
-## 使用流程
+- **简历文件数据**：手机 → 电脑浏览器，**P2P 直传，不经过任何服务器/云**
+- **FastAPI 只做信令**（交换 SDP offer/answer 和 ICE candidate，几 KB，不碰文件）
+- **完全可离线**：不需要互联网、不需要 Cloudflare、不需要公网 IP
+- 类似"面对面快传"（AirDrop / LocalSend 体验）
 
-1. **设置招聘会**：填名称、填简历保存目录（如 `D:\招聘会\2026-08-25`），点保存
-2. **公网地址（可选）**：填 Cloudflare 隧道地址则二维码指向公网；留空则用局域网 IP
-3. **展示二维码**：大屏自动显示二维码，手机扫码进入上传页
-4. **实时统计**：大屏每 3 秒刷新，显示已收简历数 + 最近上传记录
-5. **结束收场**：点「结束本场 / 清空计数」开始新一场（已收文件不删除）
+### 快速开始
 
-## 技术栈
+双击 `run.bat`（首次自动建 venv 装依赖）：
 
-| 层 | 选型 |
-|---|---|
-| 后端 | Python + FastAPI + Uvicorn |
-| 存储 | SQLite（`data/br_talenthub.db`） |
-| 文件 | 本地文件系统（保存目录下，自动按时间戳+随机串重命名） |
-| 二维码 | qrcode + Pillow（本地生成，无需外网） |
-| 公网隧道 | Cloudflare 快速隧道（cloudflared，免费、免登录） |
-| 前端 | 原生 HTML/JS（零构建，单进程，现场电脑无需装 Node） |
-| 部署 | Windows 原生，双击运行 |
+```
+管理端大屏:  http://localhost:8000
+手机上传页:  http://localhost:8000/upload
+```
 
-## 项目结构
+1. 管理端设置招聘会名称、保存目录
+2. 大屏显示二维码，手机扫码
+3. 手机填姓名/岗位，选简历 → 点「直传简历」
+4. 简历通过 WebRTC 点对点直传电脑，自动落盘到指定文件夹
+5. 大屏实时显示连接数、传输进度、已收简历
+
+### 文件落盘规则
+
+保存目录下自动重命名：`时间戳_随机串.pdf`（如 `20260825173000_a1b2c3.pdf`），SQLite 记录姓名/岗位/原始文件名/大小。
+
+### 项目结构
 
 ```
 BR_ResumeCollect/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py        # FastAPI 应用：路由、二维码、上传、配置
+│   ├── main.py        # FastAPI：信令接口 + 文件接收落盘 + 配置
 │   └── database.py    # SQLite 数据层
 ├── static/
-│   ├── admin.html     # 管理端大屏
-│   └── upload.html    # 手机上传页
-├── data/              # SQLite 数据库 + 二维码图片（运行时生成）
+│   ├── admin.html     # 电脑端大屏（WebRTC 接收方）
+│   └── upload.html    # 手机端发送页（WebRTC 发送方）
+├── data/              # SQLite 数据库
 ├── resumes/           # 默认简历保存目录
-├── logs/              # 服务/隧道日志
 ├── requirements.txt
-├── run.bat            # 局域网模式一键启动
-├── run_online.bat     # 公网模式一键启动
+├── run.bat            # 一键启动
 └── README.md
 ```
 
-## 主要 API
+### 信令 API（文件不经过这些接口，仅交换连接信息）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/config` | 当前招聘会配置 + 局域网地址 + 公网地址 + 统计 |
-| POST | `/api/config` | 设置招聘会名称 / 保存目录 / 公网地址 |
-| GET | `/api/stats` | 实时统计（总数 + 最近上传） |
-| GET | `/api/qrcode` | 生成二维码 PNG（公网优先） |
-| POST | `/api/resumes/upload` | 手机上传简历（multipart） |
-| GET | `/api/resumes` | 上传记录列表 |
-| GET | `/api/resumes/{id}/download` | 下载原始简历 |
-| POST | `/api/event/reset` | 开始新一场（换 event_id + 清计数） |
+| POST | `/api/signaling/offer` | 电脑端登记 SDP offer |
+| GET | `/api/signaling/offer` | 手机端取 offer |
+| POST | `/api/signaling/answer` | 手机端回填 answer |
+| GET | `/api/signaling/answer` | 电脑端轮询 answer |
+| POST/GET | `/api/signaling/pc-ice` | 电脑端 ICE candidate |
+| POST/GET | `/api/signaling/phone-ice` | 手机端 ICE candidate |
+| POST | `/api/resumes/save` | 电脑浏览器收完文件后本地落盘 |
 
-## 现场注意事项
+### 现场注意事项
 
-- **局域网模式**：手机和电脑必须连同一个局域网，电脑防火墙需放行 8000 端口
-- **公网模式**：无需放行端口，Cloudflare 隧道自动穿透；简历数据仍只存在于本地电脑，不上云
-- 只允许 PDF / DOC / DOCX，单文件 ≤ 20MB
-- 快速隧道链接重启后会变；需要永久固定域名可升级为 Cloudflare 命名隧道（需自购域名）
+- 手机与电脑需在同一局域网（或可互相访问的网络），供加载页面 + 信令
+- **简历文件本身 P2P 直传**，不依赖现场外网质量
+- 支持 PDF / DOC / DOCX，≤100MB
+- 当前信令为单会话（一台手机同时连接）；多人场景是后续迭代项
 
-## 后续规划（第二版起）
+### 后续规划
 
-- 招聘会管理（多场并存、历史记录）
-- Excel 导出上传记录
-- AI 简历解析（对接 JD / 面试资料，扩展为 BR 招聘数据平台）
-- 上传时自动备份到云端（R2），防本地电脑故障丢数据
+- [ ] 打包成 `BR-TalentHub.exe`（双击启动，免装 Python）
+- [ ] 多手机同时连接（会话 ID 区分）
+- [ ] 传输断点续传 / 校验
+- [ ] Excel 导出、AI 简历解析

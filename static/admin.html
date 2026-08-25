@@ -3,15 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BR TalentHub · 简历收集</title>
+<title>BR TalentHub · P2P 简历收集</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
     background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-    color: #e8f1f5;
-    min-height: 100vh;
-    padding: 24px;
+    color: #e8f1f5; min-height: 100vh; padding: 24px;
   }
   .container { max-width: 1280px; margin: 0 auto; }
   header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
@@ -22,11 +20,8 @@
   @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
 
   .card {
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 14px;
-    padding: 20px;
-    backdrop-filter: blur(6px);
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px; padding: 20px; backdrop-filter: blur(6px);
   }
   .card h2 { font-size: 15px; color: #b3cde0; margin-bottom: 16px; font-weight: 600; }
   label { display: block; font-size: 13px; color: #9fb8cc; margin: 12px 0 6px; }
@@ -42,52 +37,48 @@
   .btn:hover { opacity: .85; }
   .btn-primary { background: #4fc3f7; color: #08303f; width: 100%; margin-top: 18px; }
   .btn-ghost { background: rgba(255,255,255,0.1); color: #e8f1f5; }
-  .btn-danger { background: #ef5350; color: #fff; }
-  .btn-sm { padding: 6px 12px; font-size: 13px; }
 
   .qr-box { text-align: center; }
-  .qr-box img { width: 220px; height: 220px; background: #fff; padding: 10px; border-radius: 10px; }
+  .qr-box img { width: 200px; height: 200px; background: #fff; padding: 10px; border-radius: 10px; }
   .qr-url { font-size: 12px; color: #9fb8cc; margin-top: 10px; word-break: break-all; }
   .qr-hint { font-size: 13px; color: #ffe082; margin-top: 8px; }
 
   .stat-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
-  .stat {
-    flex: 1; min-width: 160px; background: rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; text-align: center;
-  }
+  .stat { flex: 1; min-width: 160px; background: rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; text-align: center; }
   .stat .num { font-size: 34px; font-weight: 700; color: #4fc3f7; }
   .stat .lbl { font-size: 13px; color: #9fb8cc; margin-top: 4px; }
 
+  .status-bar { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 14px; }
+  .status-bar.connecting { background: rgba(255,193,7,0.12); border: 1px solid rgba(255,193,7,0.4); color: #ffe082; }
+  .status-bar.connected { background: rgba(102,187,106,0.12); border: 1px solid rgba(102,187,106,0.4); color: #a5d6a7; }
+  .status-bar.waiting { background: rgba(79,195,247,0.12); border: 1px solid rgba(79,195,247,0.4); color: #81d4fa; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex-shrink: 0; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% {opacity:1} 50% {opacity:.35} }
+
   .recent { list-style: none; }
-  .recent li {
-    display: flex; align-items: center; gap: 12px; padding: 10px 4px;
-    border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 14px;
-  }
+  .recent li { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 14px; }
   .recent li:last-child { border-bottom: none; }
   .recent .badge { width: 8px; height: 8px; border-radius: 50%; background: #66bb6a; flex-shrink: 0; }
   .recent .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .recent .meta { color: #9fb8cc; font-size: 12px; flex-shrink: 0; }
   .empty { color: #7a93a8; text-align: center; padding: 24px 0; font-size: 14px; }
-  .toast {
-    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-    background: #32373e; color: #fff; padding: 12px 22px; border-radius: 8px;
-    font-size: 14px; z-index: 99; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-    opacity: 0; transition: opacity .25s; pointer-events: none;
-  }
+
+  .transfer { padding: 14px; border-radius: 10px; background: rgba(255,255,255,0.08); margin-bottom: 16px; display: none; }
+  .transfer.show { display: block; }
+  .transfer .tf-name { font-size: 14px; margin-bottom: 8px; }
+  .progress { height: 10px; border-radius: 6px; background: rgba(255,255,255,0.12); overflow: hidden; }
+  .progress .bar { height: 100%; width: 0%; background: linear-gradient(90deg, #4fc3f7, #66bb6a); transition: width .15s; }
+  .transfer .tf-info { font-size: 12px; color: #9fb8cc; margin-top: 6px; text-align: right; }
+  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #32373e; color: #fff; padding: 12px 22px; border-radius: 8px; font-size: 14px; z-index: 99; box-shadow: 0 4px 16px rgba(0,0,0,0.3); opacity: 0; transition: opacity .25s; pointer-events: none; }
   .toast.show { opacity: 1; }
   .toast.err { background: #c62828; }
-  .dir-line { display: flex; gap: 8px; }
-  .dir-line input { flex: 1; }
-  .savedir-hint { font-size: 12px; color: #7a93a8; margin-top: 8px; word-break: break-all; }
-  .status-pill {
-    display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px;
-    background: rgba(102,187,106,0.15); color: #a5d6a7; border: 1px solid rgba(102,187,106,0.4);
-  }
+  .p2p-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; background: rgba(102,187,106,0.15); color: #a5d6a7; border: 1px solid rgba(102,187,106,0.4); margin-left: 8px; }
 </style>
 </head>
 <body>
 <div class="container">
   <header>
-    <div class="logo">BR <span>TalentHub</span></div>
+    <div class="logo">BR <span>TalentHub</span> <span class="p2p-badge">P2P 直传 · 文件不上云</span></div>
     <div class="event-name" id="headerEvent">—</div>
   </header>
 
@@ -99,43 +90,41 @@
         <label>招聘会名称</label>
         <input type="text" id="eventName" placeholder="如：2026 北人招聘会">
         <label>简历保存目录</label>
-        <div class="dir-line">
-          <input type="text" id="saveDir" placeholder="如：D:\招聘会\2026-08">
-          <button class="btn btn-ghost btn-sm" onclick="pickDir()">浏览</button>
-        </div>
-        <label>公网访问地址（可选，填了手机在任何网络都能扫码）</label>
-        <input type="text" id="publicUrl" placeholder="如：https://xxx.trycloudflare.com">
-        <div class="savedir-hint" style="margin-top:6px">留空则使用局域网地址，仅现场同 Wi-Fi 可访问</div>
-        <button class="btn btn-primary" onclick="saveConfig()">保存并开始收集</button>
-        <div class="savedir-hint" id="saveDirHint"></div>
+        <input type="text" id="saveDir" placeholder="如：D:\招聘会\2026-08">
+        <button class="btn btn-primary" onclick="saveConfig()">保存并开始接收</button>
         <div style="margin-top:16px; display:flex; gap:8px">
-          <button class="btn btn-ghost btn-sm" onclick="openFolder()">打开保存文件夹</button>
-          <button class="btn btn-danger btn-sm" onclick="resetEvent()">结束本场 / 清空计数</button>
+          <button class="btn btn-ghost" onclick="openFolder()">打开保存文件夹</button>
+          <button class="btn btn-ghost" onclick="newPeer()">重新生成连接</button>
         </div>
       </div>
 
       <div class="card qr-box">
-        <h2 style="text-align:left">现场扫码上传</h2>
-        <img id="qrImg" src="/api/qrcode" alt="二维码">
-        <div class="qr-hint">📱 手机扫码上传简历</div>
+        <h2 style="text-align:left">手机扫码直传</h2>
+        <img id="qrImg" src="" alt="二维码">
+        <div class="qr-hint">📱 手机扫码 → WebRTC 点对点直传简历</div>
         <div class="qr-url" id="qrUrl"></div>
       </div>
     </div>
 
-    <!-- 右栏：实时统计 -->
+    <!-- 右栏：连接状态 + 实时传输 -->
     <div>
       <div class="card">
-        <h2>实时收集情况</h2>
+        <h2>接收状态</h2>
+        <div class="status-bar waiting" id="statusBar">
+          <span class="dot"></span><span id="statusText">正在准备连接…</span>
+        </div>
+        <div class="transfer" id="transferBox">
+          <div class="tf-name" id="tfName"></div>
+          <div class="progress"><div class="bar" id="tfBar"></div></div>
+          <div class="tf-info" id="tfInfo"></div>
+        </div>
         <div class="stat-row">
           <div class="stat"><div class="num" id="statCount">0</div><div class="lbl">已收简历</div></div>
-          <div class="stat"><div class="num" id="statToday">0</div><div class="lbl">最近上传</div></div>
+          <div class="stat"><div class="num" id="statConn">0</div><div class="lbl">在线手机</div></div>
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
-          <h2 style="margin:0">最近上传</h2>
-          <span class="status-pill" id="livePill">● 实时监听中</span>
-        </div>
+        <h2 style="margin-bottom:6px">最近接收</h2>
         <ul class="recent" id="recentList">
-          <li class="empty">暂无上传记录</li>
+          <li class="empty">暂无接收记录</li>
         </ul>
       </div>
     </div>
@@ -146,6 +135,9 @@
 
 <script>
 let config = null;
+let pc = null;
+let dc = null;          // DataChannel（接收用）
+let onlinePhones = 0;   // 当前已连接的手机数（简化：一个 slot 只支持一台，轮询重置）
 
 function toast(msg, isErr = false) {
   const t = document.getElementById('toast');
@@ -155,109 +147,220 @@ function toast(msg, isErr = false) {
   t._timer = setTimeout(() => t.classList.remove('show'), 2600);
 }
 
+function setStatus(state, text) {
+  const bar = document.getElementById('statusBar');
+  bar.className = 'status-bar ' + state;
+  document.getElementById('statusText').textContent = text;
+}
+
 async function loadConfig() {
-  try {
-    const r = await fetch('/api/config');
-    config = await r.json();
-    document.getElementById('eventName').value = config.event_name;
-    document.getElementById('saveDir').value = config.save_dir;
-    document.getElementById('publicUrl').value = config.public_url || '';
-    document.getElementById('saveDirHint').textContent = '当前保存目录：' + config.save_dir;
-    document.getElementById('headerEvent').textContent = config.event_name;
-    document.getElementById('qrUrl').textContent = getAccessUrl(config);
-    renderStats(config.count, config.host_ip);
-  } catch (e) {
-    toast('无法连接后端服务', true);
-  }
+  const r = await fetch('/api/config');
+  config = await r.json();
+  document.getElementById('eventName').value = config.event_name;
+  document.getElementById('saveDir').value = config.save_dir;
+  document.getElementById('headerEvent').textContent = config.event_name;
+  document.getElementById('statCount').textContent = config.count;
 }
 
 async function saveConfig() {
-  const payload = {
-    event_name: document.getElementById('eventName').value,
-    save_dir: document.getElementById('saveDir').value,
-    public_url: document.getElementById('publicUrl').value,
-  };
   const r = await fetch('/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      event_name: document.getElementById('eventName').value,
+      save_dir: document.getElementById('saveDir').value,
+    }),
   });
-  if (!r.ok) {
-    const err = await r.json().catch(() => ({}));
-    toast((err.detail || '保存失败'), true);
-    return;
-  }
+  if (!r.ok) return toast('保存失败', true);
   config = await r.json();
-  // 刷新二维码（目录/名称变化不影响 URL，但保持一致性）
-  document.getElementById('qrImg').src = '/api/qrcode?t=' + Date.now();
+  toast('已保存 ✅');
   loadConfig();
-  toast('已保存并开始收集 ✅');
+}
+
+// ------------------------------------------------------------ WebRTC 接收方
+async function newPeer() {
+  // 清空上一轮
+  await fetch('/api/signaling/reset', { method: 'POST' });
+  setStatus('waiting', '正在创建连接…');
+
+  pc = new RTCPeerConnection({ iceServers: [] });  // 局域网直连，无需 STUN
+  onlinePhones = 0;
+  document.getElementById('statConn').textContent = onlinePhones;
+
+  // 接收手机端发的 DataChannel
+  pc.ondatachannel = (event) => {
+    dc = event.channel;
+    setupDataChannel(dc);
+  };
+
+  // 关键：主动创建一个占位 DataChannel，让 createOffer 的 SDP 包含
+  // data channel m-section、并触发 ICE gather，否则 offer 是空的无法协商。
+  // 手机端传入的通道仍由 ondatachannel 接收（两者是同一个协商下的不同通道）。
+  const placeholder = pc.createDataChannel('resume', { ordered: true });
+  placeholder.onopen = () => { try { placeholder.close(); } catch (e) {} };
+
+  // ICE candidate 上报给信令（手机端拉取）
+  pc.onicecandidate = (e) => {
+    if (e.candidate) {
+      fetch('/api/signaling/pc-ice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate: JSON.stringify(e.candidate.toJSON()) }),
+      });
+    }
+  };
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  // 登记 offer 到信令
+  await fetch('/api/signaling/offer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sdp: pc.localDescription.sdp }),
+  });
+
+  setStatus('waiting', '等待手机扫码连接…');
+  showQr();
+  pollAnswer();
+}
+
+// 轮询手机端 answer
+async function pollAnswer() {
+  try {
+    const r = await fetch('/api/signaling/answer');
+    if (r.ok) {
+      const d = await r.json();
+      await pc.setRemoteDescription({ type: 'answer', sdp: d.sdp });
+      // 拉取手机端 ICE
+      const iceR = await fetch('/api/signaling/phone-ice');
+      const iceD = await iceR.json();
+      for (const c of iceD.candidates) {
+        try { await pc.addIceCandidate(JSON.parse(c)); } catch (e) {}
+      }
+      setStatus('connected', '手机已连接 · 等待上传');
+      return;
+    }
+  } catch (e) {}
+  setTimeout(pollAnswer, 1000);
+}
+
+// 处理收到的 DataChannel
+function setupDataChannel(ch) {
+  ch.onopen = () => {
+    onlinePhones++;
+    document.getElementById('statConn').textContent = onlinePhones;
+    setStatus('connected', '手机已连接 · 等待上传');
+  };
+
+  // 接收协议：meta → 若干 chunk（base64 文本）→ end
+  let meta = null;
+  let buf = [];
+  let received = 0;
+
+  ch.onmessage = async (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch (e) { return; }
+
+    if (msg.type === 'meta') {
+      meta = msg;
+      buf = [];
+      received = 0;
+      document.getElementById('transferBox').classList.add('show');
+      document.getElementById('tfName').textContent = '📄 ' + (msg.filename || '简历');
+      updateBar(0, msg.filesize || 0);
+    } else if (msg.type === 'chunk') {
+      buf.push(msg.data);
+      received += msg.data.length;
+      if (meta) updateBar(received, meta.filesize || 0);
+    } else if (msg.type === 'end') {
+      // 组装完整 base64 → 落盘
+      const full = buf.join('');
+      const payload = {
+        name: meta ? meta.name : '',
+        phone: meta ? (meta.phone || '') : '',
+        position: meta ? (meta.position || '') : '',
+        filename: meta ? meta.filename : '',
+        data: full,
+      };
+      try {
+        const r = await fetch('/api/resumes/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const d = await r.json();
+        if (r.ok) {
+          document.getElementById('tfInfo').textContent = '✓ 已保存到本地文件夹';
+          toast('已收到 ' + (payload.filename || '') + ' ✅');
+          loadStats();
+          loadConfig();
+        } else {
+          document.getElementById('tfInfo').textContent = '✗ ' + (d.detail || '保存失败');
+          toast(d.detail || '保存失败', true);
+        }
+      } catch (e) {
+        toast('保存失败：' + e.message, true);
+      }
+    }
+  };
+
+  ch.onclose = () => {
+    onlinePhones = Math.max(0, onlinePhones - 1);
+    document.getElementById('statConn').textContent = onlinePhones;
+    setStatus('waiting', '手机已断开 · 等待新连接');
+  };
+}
+
+function updateBar(received, total) {
+  const pct = total > 0 ? Math.min(100, Math.round(received / total * 100)) : 0;
+  document.getElementById('tfBar').style.width = pct + '%';
+  document.getElementById('tfInfo').textContent = (received / 1024).toFixed(1) + ' KB / ' + (total / 1024).toFixed(1) + ' KB';
+}
+
+function showQr() {
+  const url = location.origin + '/upload';
+  document.getElementById('qrUrl').textContent = url;
+  // 用后端生成二维码
+  fetch('/api/qrcode').then(r => r.blob()).then(b => {
+    document.getElementById('qrImg').src = URL.createObjectURL(b);
+  }).catch(() => {
+    // 后端没有二维码接口，前端生成（P2P 版用外部库）
+  });
 }
 
 async function loadStats() {
   try {
     const r = await fetch('/api/stats');
     const d = await r.json();
-    renderStats(d.count, config ? config.host_ip : '');
+    document.getElementById('statCount').textContent = d.count;
     renderRecent(d.recent);
   } catch (e) {}
-}
-
-function getAccessUrl(cfg) {
-  const base = cfg.public_url || `http://${cfg.host_ip}:${cfg.port}`;
-  return `手机访问地址：${base}/upload?event=${cfg.event_id}`;
-}
-
-function renderStats(count, ip) {
-  document.getElementById('statCount').textContent = count;
-  document.getElementById('statToday').textContent = count;
-  document.getElementById('livePill').textContent = '● 运行中';
 }
 
 function renderRecent(recent) {
   const ul = document.getElementById('recentList');
   if (!recent || recent.length === 0) {
-    ul.innerHTML = '<li class="empty">暂无上传记录</li>';
+    ul.innerHTML = '<li class="empty">暂无接收记录</li>';
     return;
   }
   ul.innerHTML = recent.map(item => {
     const meta = `${item.upload_time.slice(11,16)} · ${item.name || '未留名'}`;
-    return `<li>
-      <span class="badge"></span>
-      <span class="fname">📄 ${escapeHtml(item.original)}</span>
-      <span class="meta">${escapeHtml(meta)}</span>
-    </li>`;
+    return `<li><span class="badge"></span><span class="fname">📄 ${escapeHtml(item.original)}</span><span class="meta">${escapeHtml(meta)}</span></li>`;
   }).join('');
 }
 
 function escapeHtml(s) {
-  return (s || '').replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-async function openFolder() {
+function openFolder() {
   toast('请在电脑上手动打开资源管理器访问保存目录');
-  // 浏览器无法直接打开本地文件夹，给出提示
-}
-
-async function resetEvent() {
-  if (!confirm('确定结束当前招聘会并清空计数？新的一场会生成新二维码，已上传的文件不会删除。')) return;
-  const r = await fetch('/api/event/reset', { method: 'POST' });
-  config = await r.json();
-  document.getElementById('qrImg').src = '/api/qrcode?t=' + Date.now();
-  loadConfig();
-  toast('已开始新一场招聘会');
-}
-
-function pickDir() {
-  // 网页无法弹出本地目录选择框（需 Electron/Tauri），提示手动输入
-  toast('请手动输入或粘贴文件夹路径（如 D:\\招聘会\\2026）');
 }
 
 loadConfig();
 loadStats();
-setInterval(loadStats, 3000); // 每 3 秒刷新统计
+newPeer();
 </script>
 </body>
 </html>

@@ -3,189 +3,336 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>简历上传</title>
+<title>简历直传</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-    background: #f4f6f9; min-height: 100vh; color: #2b3a4a;
-  }
-  .hero {
-    background: linear-gradient(135deg, #0f2027, #2c5364);
-    color: #fff; padding: 28px 20px; text-align: center;
-  }
+  body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f4f6f9; min-height: 100vh; color: #2b3a4a; }
+  .hero { background: linear-gradient(135deg, #0f2027, #2c5364); color: #fff; padding: 26px 20px; text-align: center; }
   .hero h1 { font-size: 22px; margin-bottom: 6px; }
   .hero p { font-size: 14px; color: #b3cde0; }
-  .form {
-    padding: 24px 20px; max-width: 480px; margin: 0 auto;
-  }
+  .hero .p2p-tag { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 20px; font-size: 12px; background: rgba(102,187,106,0.2); color: #a5d6a7; border: 1px solid rgba(102,187,106,0.4); }
+  .form { padding: 24px 20px; max-width: 480px; margin: 0 auto; }
+
+  /* 连接状态 */
+  .conn-box { text-align: center; padding: 20px; border-radius: 12px; margin-bottom: 8px; }
+  .conn-box.connecting { background: #fff8e1; color: #f9a825; }
+  .conn-box.connected { background: #e8f5e9; color: #2e7d32; }
+  .conn-box.error { background: #ffebee; color: #c62828; }
+  .conn-box .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: rot 0.8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
   label { display: block; font-size: 14px; color: #5a6b7a; margin: 18px 0 8px; font-weight: 600; }
-  input[type=text], input[type=tel] {
-    width: 100%; padding: 14px; border-radius: 10px; border: 1px solid #d8dee5;
-    font-size: 16px; background: #fff; outline: none; transition: border .15s;
-  }
+  input[type=text], input[type=tel] { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid #d8dee5; font-size: 16px; background: #fff; outline: none; }
   input:focus { border-color: #2c5364; }
 
-  .upload-zone {
-    border: 2px dashed #b0bfcc; border-radius: 12px; padding: 26px 16px;
-    text-align: center; cursor: pointer; background: #fff; margin-top: 8px;
-    transition: border .15s, background .15s;
-  }
-  .upload-zone.active { border-color: #2c5364; background: #eef4f8; }
+  .upload-zone { border: 2px dashed #b0bfcc; border-radius: 12px; padding: 26px 16px; text-align: center; cursor: pointer; background: #fff; margin-top: 8px; }
   .upload-zone .icon { font-size: 36px; }
   .upload-zone .main { font-size: 16px; color: #2b3a4a; margin-top: 8px; }
   .upload-zone .sub { font-size: 13px; color: #8b9aab; margin-top: 6px; }
-  .file-info {
-    display: none; margin-top: 10px; padding: 10px 14px; background: #e8f5e9;
-    border-radius: 8px; font-size: 14px; color: #2e7d32; word-break: break-all;
-  }
-  .submit-btn {
-    width: 100%; margin-top: 26px; padding: 15px; border: none; border-radius: 10px;
-    background: linear-gradient(135deg, #2c5364, #0f2027); color: #fff;
-    font-size: 17px; font-weight: 600; cursor: pointer;
-  }
+  .file-info { display: none; margin-top: 10px; padding: 10px 14px; background: #e8f5e9; border-radius: 8px; font-size: 14px; color: #2e7d32; word-break: break-all; }
+
+  .submit-btn { width: 100%; margin-top: 26px; padding: 15px; border: none; border-radius: 10px; background: linear-gradient(135deg, #2c5364, #0f2027); color: #fff; font-size: 17px; font-weight: 600; cursor: pointer; }
   .submit-btn:disabled { opacity: .5; cursor: not-allowed; }
-  .submit-btn.loading { background: #8b9aab; }
-  .note { text-align: center; font-size: 12px; color: #9aa9b8; margin-top: 14px; }
-  .success-box {
-    display: none; text-align: center; padding: 40px 24px;
-  }
-  .success-box .tick { font-size: 64px; color: #4caf50; }
-  .success-box h2 { margin: 12px 0 8px; font-size: 20px; }
-  .success-box p { color: #5a6b7a; font-size: 14px; }
-  .again-btn {
-    margin-top: 24px; padding: 13px 30px; border: none; border-radius: 10px;
-    background: #2c5364; color: #fff; font-size: 15px; cursor: pointer;
-  }
-  .err-msg { display: none; color: #d32f2f; font-size: 13px; margin-top: 10px; }
+  .err-msg { display: none; color: #d32f2f; font-size: 13px; margin-top: 10px; text-align: center; }
+
+  .transfer-box { display: none; text-align: center; padding: 30px 20px; }
+  .transfer-box.show { display: block; }
+  .transfer-box .big { font-size: 40px; }
+  .transfer-box h2 { margin: 12px 0 6px; font-size: 18px; }
+  .transfer-box p { color: #5a6b7a; font-size: 14px; }
+  .progress { height: 12px; border-radius: 6px; background: #e0e6ec; overflow: hidden; margin: 20px 0 8px; }
+  .progress .bar { height: 100%; width: 0%; background: linear-gradient(90deg, #2c5364, #4fc3f7); transition: width .15s; }
+  .transfer-box .pct { font-size: 15px; color: #2c5364; font-weight: 700; }
+  .success-tick { font-size: 64px; color: #4caf50; }
+  .again-btn { margin-top: 24px; padding: 13px 30px; border: none; border-radius: 10px; background: #2c5364; color: #fff; font-size: 15px; cursor: pointer; }
 </style>
 </head>
 <body>
   <div class="hero">
     <h1 id="eventTitle">招聘会</h1>
-    <p>请填写信息并上传简历</p>
+    <p>填信息后选择简历，点对点直传电脑</p>
+    <span class="p2p-tag">WebRTC P2P · 文件不经过任何服务器</span>
   </div>
 
-  <div class="form" id="formBox">
+  <!-- 连接状态 -->
+  <div class="form">
+    <div class="conn-box connecting" id="connBox">
+      <span class="spin"></span><span id="connText">正在连接招聘会电脑…</span>
+    </div>
+  </div>
+
+  <!-- 表单 -->
+  <div class="form" id="formBox" style="display:none">
     <label>姓名 <span style="color:#d32f2f">*</span></label>
     <input type="text" id="name" placeholder="请输入姓名" maxlength="30">
-
     <label>手机号</label>
     <input type="tel" id="phone" placeholder="选填" maxlength="20">
-
     <label>应聘岗位</label>
     <input type="text" id="position" placeholder="选填" maxlength="50">
-
     <label>简历附件 <span style="color:#d32f2f">*</span></label>
     <div class="upload-zone" id="uploadZone">
       <div class="icon">📎</div>
       <div class="main">点击选择简历文件</div>
-      <div class="sub">支持 PDF / DOC / DOCX，≤20MB</div>
+      <div class="sub">支持 PDF / DOC / DOCX，≤100MB</div>
     </div>
     <input type="file" id="fileInput" accept=".pdf,.doc,.docx" style="display:none">
     <div class="file-info" id="fileInfo"></div>
     <div class="err-msg" id="errMsg"></div>
-
-    <button class="submit-btn" id="submitBtn" onclick="doSubmit()">提交简历</button>
-    <div class="note">提交即表示同意将简历用于招聘用途</div>
+    <button class="submit-btn" id="submitBtn" onclick="doSend()">直传简历</button>
   </div>
 
-  <div class="success-box" id="successBox">
-    <div class="tick">✅</div>
-    <h2>上传成功！</h2>
-    <p>你的简历已提交，感谢参加本次招聘会。</p>
-    <button class="again-btn" onclick="resetForm()">再传一份</button>
+  <!-- 传输中/完成 -->
+  <div class="transfer-box" id="transferBox">
+    <div class="big" id="tfIcon">📤</div>
+    <h2 id="tfTitle">正在直传…</h2>
+    <p id="tfSub">请保持本页面开启</p>
+    <div class="progress"><div class="bar" id="tfBar"></div></div>
+    <div class="pct" id="tfPct">0%</div>
+    <button class="again-btn" id="againBtn" onclick="resetForm()" style="display:none">再传一份</button>
   </div>
 
 <script>
+const BASE = location.origin;
+let config = null;
+let pc = null;
+let dc = null;
 let selectedFile = null;
 
-// 读取招聘会名称
-(async function loadEvent() {
-  try {
-    const r = await fetch('/api/config');
-    const d = await r.json();
-    document.getElementById('eventTitle').textContent = d.event_name;
-  } catch (e) {
-    document.getElementById('eventTitle').textContent = '招聘会';
-  }
-})();
+// ---------------- 连接建立 ----------------
+async function connect() {
+  const box = document.getElementById('connBox');
+  const text = document.getElementById('connText');
+  setConn('connecting', '正在连接招聘会电脑…');
 
+  try {
+    // 1. 从信令服务器取电脑的 offer
+    const offR = await fetch(BASE + '/api/signaling/offer');
+    if (!offR.ok) throw new Error('未找到电脑连接，请确认电脑端已打开');
+    const offD = await offR.json();
+
+    // 2. 创建发送端连接 + DataChannel
+    pc = new RTCPeerConnection({ iceServers: [] });
+    dc = pc.createDataChannel('file', { ordered: true });
+    setupDc();
+
+    // 3. 上报自己的 ICE
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        fetch(BASE + '/api/signaling/phone-ice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidate: JSON.stringify(e.candidate.toJSON()) }),
+        });
+      }
+    };
+
+    // 4. 用电脑的 offer 生成 answer
+    await pc.setRemoteDescription({ type: 'offer', sdp: offD.sdp });
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await fetch(BASE + '/api/signaling/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sdp: pc.localDescription.sdp }),
+    });
+
+    // 5. 拉取电脑的 ICE candidate
+    const iceR = await fetch(BASE + '/api/signaling/pc-ice');
+    const iceD = await iceR.json();
+    for (const c of iceD.candidates) {
+      try { await pc.addIceCandidate(JSON.parse(c)); } catch (e) {}
+    }
+
+    // 6. 等待 DataChannel 打开（轮询 readyState，避免 onopen 事件竞态丢失）
+    await new Promise((resolve, reject) => {
+      const deadline = Date.now() + 15000;
+      const timer = setInterval(() => {
+        if (dc.readyState === 'open') {
+          clearInterval(timer);
+          resolve();
+        } else if (dc.readyState === 'closed' || dc.readyState === 'failed') {
+          clearInterval(timer);
+          reject(new Error('连接关闭'));
+        } else if (Date.now() > deadline) {
+          clearInterval(timer);
+          reject(new Error('连接超时'));
+        }
+      }, 300);
+      // 兜底：事件也可能先到
+      dc.onopen = () => { clearInterval(timer); resolve(); };
+    });
+
+    setConn('connected', '已连接招聘会电脑 ✅');
+    document.getElementById('formBox').style.display = 'block';
+
+    // 读取招聘会名称
+    try {
+      const c = await (await fetch(BASE + '/api/config')).json();
+      document.getElementById('eventTitle').textContent = c.event_name;
+    } catch (e) {}
+  } catch (err) {
+    setConn('error', '连接失败：' + err.message);
+  }
+}
+
+function setConn(state, msg) {
+  const box = document.getElementById('connBox');
+  box.className = 'conn-box ' + state;
+  box.innerHTML = (state === 'connecting' ? '<span class="spin"></span>' : '') + '<span>' + msg + '</span>';
+}
+
+// DataChannel 发送端逻辑
+function setupDc() {
+  dc.onclose = () => {
+    // 连接断了
+    const t = document.getElementById('tfTitle');
+    if (t && t.textContent.includes('直传')) {
+      t.textContent = '连接中断';
+      document.getElementById('tfSub').textContent = '请回到首页重新扫码';
+    }
+  };
+}
+
+// ---------------- 文件选择 ----------------
 const zone = document.getElementById('uploadZone');
 const input = document.getElementById('fileInput');
-
 zone.addEventListener('click', () => input.click());
 input.addEventListener('change', e => {
   const f = e.target.files[0];
   if (!f) return;
-  selectedFile = f;
   const ok = ['.pdf', '.doc', '.docx'].some(x => f.name.toLowerCase().endsWith(x));
-  const sizeOk = f.size <= 20 * 1024 * 1024;
-  const info = document.getElementById('fileInfo');
+  const sizeOk = f.size <= 100 * 1024 * 1024;
   const err = document.getElementById('errMsg');
+  const info = document.getElementById('fileInfo');
   err.style.display = 'none';
-  if (!ok) {
-    err.textContent = '仅支持 PDF / DOC / DOCX 格式';
-    err.style.display = 'block';
-    info.style.display = 'none';
-    selectedFile = null;
-    return;
-  }
-  if (!sizeOk) {
-    err.textContent = '文件不能超过 20MB';
-    err.style.display = 'block';
-    info.style.display = 'none';
-    selectedFile = null;
-    return;
-  }
+  if (!ok) { err.textContent = '仅支持 PDF / DOC / DOCX'; err.style.display = 'block'; info.style.display='none'; selectedFile=null; return; }
+  if (!sizeOk) { err.textContent = '文件不能超过 100MB'; err.style.display = 'block'; info.style.display='none'; selectedFile=null; return; }
+  selectedFile = f;
   info.textContent = '📄 ' + f.name + '（' + (f.size/1024/1024).toFixed(1) + 'MB）';
   info.style.display = 'block';
 });
 
-async function doSubmit() {
+// ---------------- 发送 ----------------
+async function doSend() {
   const err = document.getElementById('errMsg');
   err.style.display = 'none';
   const name = document.getElementById('name').value.trim();
   if (!name) { err.textContent = '请填写姓名'; err.style.display = 'block'; return; }
   if (!selectedFile) { err.textContent = '请选择简历附件'; err.style.display = 'block'; return; }
+  if (dc.readyState !== 'open') { err.textContent = '连接已断开，请刷新重试'; err.style.display = 'block'; return; }
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
-  btn.textContent = '上传中…';
-  btn.classList.add('loading');
 
-  const fd = new FormData();
-  fd.append('name', name);
-  fd.append('phone', document.getElementById('phone').value.trim());
-  fd.append('position', document.getElementById('position').value.trim());
-  fd.append('file', selectedFile);
+  document.getElementById('formBox').style.display = 'none';
+  document.getElementById('transferBox').classList.add('show');
+  document.getElementById('tfIcon').textContent = '📤';
+  document.getElementById('tfTitle').textContent = '正在直传…';
+  document.getElementById('tfSub').textContent = selectedFile.name;
+  document.getElementById('againBtn').style.display = 'none';
+  setBar(0);
 
   try {
-    const r = await fetch('/api/resumes/upload', { method: 'POST', body: fd });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.detail || '上传失败');
-    document.getElementById('formBox').style.display = 'none';
-    document.getElementById('successBox').style.display = 'block';
-  } catch (e) {
-    err.textContent = e.message;
-    err.style.display = 'block';
-  } finally {
+    // 分块读取文件转 base64
+    const CHUNK = 64 * 1024; // 64KB 一块
+    const total = selectedFile.size;
+    const fileBuf = await selectedFile.arrayBuffer();
+
+    // 发送 meta
+    dc.send(JSON.stringify({
+      type: 'meta',
+      name,
+      phone: document.getElementById('phone').value.trim(),
+      position: document.getElementById('position').value.trim(),
+      filename: selectedFile.name,
+      filesize: total,
+    }));
+
+    // 分块发送 base64
+    const chunkCount = Math.ceil(fileBuf.byteLength / CHUNK);
+    for (let i = 0; i < chunkCount; i++) {
+      const slice = fileBuf.slice(i * CHUNK, (i + 1) * CHUNK);
+      const b64 = await blobToBase64(new Blob([slice]));
+      dc.send(JSON.stringify({ type: 'chunk', data: b64 }));
+      setBar(Math.round((i + 1) / chunkCount * 100));
+      // 稍等让接收端缓冲
+      await new Promise(r => setTimeout(r, 5));
+    }
+
+    // 发送 end
+    dc.send(JSON.stringify({ type: 'end' }));
+
+    // 显示完成
+    document.getElementById('tfIcon').textContent = '✅';
+    document.getElementById('tfTitle').textContent = '已发送！';
+    document.getElementById('tfSub').textContent = '简历已直传电脑并保存到本地文件夹';
+    setBar(100);
+    document.getElementById('againBtn').style.display = 'inline-block';
     btn.disabled = false;
-    btn.textContent = '提交简历';
-    btn.classList.remove('loading');
+  } catch (e) {
+    document.getElementById('tfIcon').textContent = '❌';
+    document.getElementById('tfTitle').textContent = '发送失败';
+    document.getElementById('tfSub').textContent = e.message;
+    btn.disabled = false;
   }
 }
 
+function setBar(pct) {
+  document.getElementById('tfBar').style.width = pct + '%';
+  document.getElementById('tfPct').textContent = pct + '%';
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result).split(',')[1]);
+    fr.onerror = reject;
+    fr.readAsDataURL(blob);
+  });
+}
+
 function resetForm() {
-  document.getElementById('successBox').style.display = 'none';
+  document.getElementById('transferBox').classList.remove('show');
   document.getElementById('formBox').style.display = 'block';
   document.getElementById('name').value = '';
   document.getElementById('phone').value = '';
   document.getElementById('position').value = '';
   document.getElementById('fileInfo').style.display = 'none';
-  document.getElementById('fileInfo').textContent = '';
   input.value = '';
   selectedFile = null;
+}
+
+// 测试钩子：URL 带 ?test=1 时，连接建立后自动发送一个内置测试 PDF
+// （仅用于端到端自测，正常使用不会触发）
+async function runAutoTest() {
+  document.getElementById('name').value = 'P2P自动测试';
+  document.getElementById('phone').value = '13800001111';
+  document.getElementById('position').value = '端到端验证';
+  // 构造一个假的 File 对象
+  const bytes = new Uint8Array([
+    0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0x0a,  // %PDF-1.4\n
+    0x25, 0x25, 0x20, 0x50, 0x32, 0x50, 0x20, 0x61, 0x75, 0x74, 0x6f, 0x74, 0x65, 0x73, 0x74, 0x0a, 0x0a,
+    0x31, 0x20, 0x30, 0x20, 0x6f, 0x62, 0x6a, 0x0a, 0x3c, 0x3c, 0x2f, 0x54, 0x79, 0x70, 0x65, 0x2f, 0x43, 0x61, 0x74, 0x61, 0x6c, 0x6f, 0x67, 0x3e, 0x3e, 0x0a, 0x65, 0x6e, 0x64, 0x6f, 0x62, 0x6a, 0x0a,
+  ]);
+  selectedFile = new File([bytes], 'P2P自动测试_简历.pdf', { type: 'application/pdf' });
+  const info = document.getElementById('fileInfo');
+  info.textContent = '📄 ' + selectedFile.name + '（' + (selectedFile.size/1024).toFixed(1) + 'KB）';
+  info.style.display = 'block';
+  await doSend();
+}
+
+// 启动
+connect();
+
+// 自动测试模式
+if (new URLSearchParams(location.search).get('test') === '1') {
+  // 等连接建立后再触发
+  const checkConnected = setInterval(() => {
+    if (dc && dc.readyState === 'open') {
+      clearInterval(checkConnected);
+      setTimeout(runAutoTest, 500);
+    }
+  }, 500);
 }
 </script>
 </body>
