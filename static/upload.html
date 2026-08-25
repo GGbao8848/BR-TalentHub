@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>简历上传</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f4f6f9; min-height: 100vh; color: #2b3a4a;
+  }
+  .hero {
+    background: linear-gradient(135deg, #0f2027, #2c5364);
+    color: #fff; padding: 28px 20px; text-align: center;
+  }
+  .hero h1 { font-size: 22px; margin-bottom: 6px; }
+  .hero p { font-size: 14px; color: #b3cde0; }
+  .form {
+    padding: 24px 20px; max-width: 480px; margin: 0 auto;
+  }
+  label { display: block; font-size: 14px; color: #5a6b7a; margin: 18px 0 8px; font-weight: 600; }
+  input[type=text], input[type=tel] {
+    width: 100%; padding: 14px; border-radius: 10px; border: 1px solid #d8dee5;
+    font-size: 16px; background: #fff; outline: none; transition: border .15s;
+  }
+  input:focus { border-color: #2c5364; }
+
+  .upload-zone {
+    border: 2px dashed #b0bfcc; border-radius: 12px; padding: 26px 16px;
+    text-align: center; cursor: pointer; background: #fff; margin-top: 8px;
+    transition: border .15s, background .15s;
+  }
+  .upload-zone.active { border-color: #2c5364; background: #eef4f8; }
+  .upload-zone .icon { font-size: 36px; }
+  .upload-zone .main { font-size: 16px; color: #2b3a4a; margin-top: 8px; }
+  .upload-zone .sub { font-size: 13px; color: #8b9aab; margin-top: 6px; }
+  .file-info {
+    display: none; margin-top: 10px; padding: 10px 14px; background: #e8f5e9;
+    border-radius: 8px; font-size: 14px; color: #2e7d32; word-break: break-all;
+  }
+  .submit-btn {
+    width: 100%; margin-top: 26px; padding: 15px; border: none; border-radius: 10px;
+    background: linear-gradient(135deg, #2c5364, #0f2027); color: #fff;
+    font-size: 17px; font-weight: 600; cursor: pointer;
+  }
+  .submit-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .submit-btn.loading { background: #8b9aab; }
+  .note { text-align: center; font-size: 12px; color: #9aa9b8; margin-top: 14px; }
+  .success-box {
+    display: none; text-align: center; padding: 40px 24px;
+  }
+  .success-box .tick { font-size: 64px; color: #4caf50; }
+  .success-box h2 { margin: 12px 0 8px; font-size: 20px; }
+  .success-box p { color: #5a6b7a; font-size: 14px; }
+  .again-btn {
+    margin-top: 24px; padding: 13px 30px; border: none; border-radius: 10px;
+    background: #2c5364; color: #fff; font-size: 15px; cursor: pointer;
+  }
+  .err-msg { display: none; color: #d32f2f; font-size: 13px; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <div class="hero">
+    <h1 id="eventTitle">招聘会</h1>
+    <p>请填写信息并上传简历</p>
+  </div>
+
+  <div class="form" id="formBox">
+    <label>姓名 <span style="color:#d32f2f">*</span></label>
+    <input type="text" id="name" placeholder="请输入姓名" maxlength="30">
+
+    <label>手机号</label>
+    <input type="tel" id="phone" placeholder="选填" maxlength="20">
+
+    <label>应聘岗位</label>
+    <input type="text" id="position" placeholder="选填" maxlength="50">
+
+    <label>简历附件 <span style="color:#d32f2f">*</span></label>
+    <div class="upload-zone" id="uploadZone">
+      <div class="icon">📎</div>
+      <div class="main">点击选择简历文件</div>
+      <div class="sub">支持 PDF / DOC / DOCX，≤20MB</div>
+    </div>
+    <input type="file" id="fileInput" accept=".pdf,.doc,.docx" style="display:none">
+    <div class="file-info" id="fileInfo"></div>
+    <div class="err-msg" id="errMsg"></div>
+
+    <button class="submit-btn" id="submitBtn" onclick="doSubmit()">提交简历</button>
+    <div class="note">提交即表示同意将简历用于招聘用途</div>
+  </div>
+
+  <div class="success-box" id="successBox">
+    <div class="tick">✅</div>
+    <h2>上传成功！</h2>
+    <p>你的简历已提交，感谢参加本次招聘会。</p>
+    <button class="again-btn" onclick="resetForm()">再传一份</button>
+  </div>
+
+<script>
+let selectedFile = null;
+
+// 读取招聘会名称
+(async function loadEvent() {
+  try {
+    const r = await fetch('/api/config');
+    const d = await r.json();
+    document.getElementById('eventTitle').textContent = d.event_name;
+  } catch (e) {
+    document.getElementById('eventTitle').textContent = '招聘会';
+  }
+})();
+
+const zone = document.getElementById('uploadZone');
+const input = document.getElementById('fileInput');
+
+zone.addEventListener('click', () => input.click());
+input.addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  selectedFile = f;
+  const ok = ['.pdf', '.doc', '.docx'].some(x => f.name.toLowerCase().endsWith(x));
+  const sizeOk = f.size <= 20 * 1024 * 1024;
+  const info = document.getElementById('fileInfo');
+  const err = document.getElementById('errMsg');
+  err.style.display = 'none';
+  if (!ok) {
+    err.textContent = '仅支持 PDF / DOC / DOCX 格式';
+    err.style.display = 'block';
+    info.style.display = 'none';
+    selectedFile = null;
+    return;
+  }
+  if (!sizeOk) {
+    err.textContent = '文件不能超过 20MB';
+    err.style.display = 'block';
+    info.style.display = 'none';
+    selectedFile = null;
+    return;
+  }
+  info.textContent = '📄 ' + f.name + '（' + (f.size/1024/1024).toFixed(1) + 'MB）';
+  info.style.display = 'block';
+});
+
+async function doSubmit() {
+  const err = document.getElementById('errMsg');
+  err.style.display = 'none';
+  const name = document.getElementById('name').value.trim();
+  if (!name) { err.textContent = '请填写姓名'; err.style.display = 'block'; return; }
+  if (!selectedFile) { err.textContent = '请选择简历附件'; err.style.display = 'block'; return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '上传中…';
+  btn.classList.add('loading');
+
+  const fd = new FormData();
+  fd.append('name', name);
+  fd.append('phone', document.getElementById('phone').value.trim());
+  fd.append('position', document.getElementById('position').value.trim());
+  fd.append('file', selectedFile);
+
+  try {
+    const r = await fetch('/api/resumes/upload', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || '上传失败');
+    document.getElementById('formBox').style.display = 'none';
+    document.getElementById('successBox').style.display = 'block';
+  } catch (e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '提交简历';
+    btn.classList.remove('loading');
+  }
+}
+
+function resetForm() {
+  document.getElementById('successBox').style.display = 'none';
+  document.getElementById('formBox').style.display = 'block';
+  document.getElementById('name').value = '';
+  document.getElementById('phone').value = '';
+  document.getElementById('position').value = '';
+  document.getElementById('fileInfo').style.display = 'none';
+  document.getElementById('fileInfo').textContent = '';
+  input.value = '';
+  selectedFile = null;
+}
+</script>
+</body>
+</html>

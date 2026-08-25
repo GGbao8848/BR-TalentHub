@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 运行时数据
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/qrcode_online.png
+data/qr_preview.png
+logs/
+resumes/
+
+# 系统
+Thumbs.db
+.DS_Store
+test_full.py
