@@ -11,7 +11,7 @@
               </div>
               <div style="font-size:15px;color:#475569;font-weight:600">{{ eventName }}</div>
             </n-layout-header>
-            <n-layout has-sider style="height:calc(100vh - 56px)">
+            <n-layout has-sider position="absolute" style="top:56px;bottom:0">
               <n-layout-sider
                 bordered
                 :width="210"
@@ -32,8 +32,8 @@
                   @update:value="onMenuChange"
                 />
               </n-layout-sider>
-              <n-layout content-style="padding:24px;background:#f5f7fa;height:100%;overflow:hidden;display:flex">
-                <div style="flex:1;min-height:0;overflow-y:auto">
+              <n-layout style="height:100%" content-style="padding:24px;background:#f5f7fa;height:100%;overflow:hidden;display:flex">
+                <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column">
                   <router-view />
                 </div>
               </n-layout>

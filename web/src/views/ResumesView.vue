@@ -1,12 +1,20 @@
 <template>
   <div class="resumes-layout">
-    <!-- 左栏：筛选 + 列表（懒加载） -->
+    <!-- 左栏：筛选 + 无限滚动列表 -->
     <div class="left-pane">
-      <n-card size="small" title="筛选" style="margin-bottom:12px">
+      <n-card size="small" title="筛选" style="margin-bottom:12px;flex-shrink:0">
         <n-space vertical size="small">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <n-select v-model:value="filter.school" :options="schoolOptions" clearable placeholder="全部学校" size="small" />
-            <n-select v-model:value="filter.position" :options="positionOptions" clearable placeholder="全部岗位" size="small" />
+            <n-popselect v-model:value="filter.school" :options="schoolOptions" size="small" scrollable clearable>
+              <n-button size="small" quaternary style="width:100%">
+                {{ filter.school || '全部学校' }}
+              </n-button>
+            </n-popselect>
+            <n-popselect v-model:value="filter.position" :options="positionOptions" size="small" scrollable clearable>
+              <n-button size="small" quaternary style="width:100%">
+                {{ filter.position || '全部岗位' }}
+              </n-button>
+            </n-popselect>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <n-date-picker v-model:value="filter.dateStart" type="date" clearable size="small" placeholder="开始日期" />
@@ -20,56 +28,53 @@
         </n-space>
       </n-card>
 
-      <n-card size="small" class="list-card">
-        <template #header>
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <span>简历列表（{{ total }}）</span>
-            <n-space size="4">
-              <n-button size="tiny" @click="downloadFiltered">⬇ 导出</n-button>
-            </n-space>
+      <div class="left-title">简历列表</div>
+      <n-infinite-scroll class="resume-scroll" :distance="10" @load="handleLoad">
+        <div
+          v-for="row in items"
+          :key="row.id"
+          class="resume-item"
+          :class="{ 'item-active': row.id === currentId }"
+          @click="selectRow(row)"
+        >
+          <div class="item-info">
+            <div class="item-line1">{{ row.name || '未留名' }} · {{ row.position_name || row.position }}</div>
+            <div class="item-line2">{{ row.school_name || '—' }} · {{ (row.upload_time || '').slice(0, 16) }}</div>
           </div>
-        </template>
-
-        <div class="list-body" ref="listBody" @scroll="onListScroll">
-          <n-empty v-if="!items.length && !loading" description="暂无简历" style="padding:30px 0" />
-          <div
-            v-for="row in items"
-            :key="row.id"
-            class="resume-item"
-            :class="{ active: row.id === currentId }"
-            @click="selectRow(row)"
-          >
-            <span class="item-dot" :class="{ 'dot-on': row.id === currentId }"></span>
-            <div class="item-content">
-              <div class="item-line1">
-                <span class="item-name">{{ row.name || '未留名' }}</span>
-                <span class="item-pos">{{ row.position_name || row.position }}</span>
-              </div>
-              <div class="item-line2">{{ row.original }}</div>
-            </div>
-            <div class="item-right">
-              <span class="item-meta">{{ (row.upload_time || '').slice(0, 16) }} · {{ row.school_name || '—' }}</span>
-              <span class="item-del" @click.stop="deleteOne(row)" title="删除">🗑</span>
-            </div>
+          <div class="item-actions">
+            <n-button size="tiny" type="error" quaternary @click.stop="deleteOne(row)">删除</n-button>
           </div>
-          <div v-if="loading" style="text-align:center;padding:12px;color:#94a3b8;font-size:13px">加载中…</div>
-          <div v-if="!loading && hasMore" style="text-align:center;padding:8px;color:#94a3b8;font-size:12px">下滑加载更多</div>
-          <div v-if="!loading && !hasMore && items.length" style="text-align:center;padding:8px;color:#cbd5e1;font-size:12px">已加载全部</div>
         </div>
-      </n-card>
+        <div v-if="loading" class="list-hint">加载中…</div>
+        <div v-else-if="finished" class="list-hint">已加载全部</div>
+      </n-infinite-scroll>
     </div>
 
-    <!-- 右栏：PDF 查看器 -->
+    <!-- 右栏：简历查看器（仅在查看器内滚动） -->
     <div class="right-pane">
+      <div class="preview-nav">
+        <n-space align="center" size="8">
+          <n-button size="small" :disabled="!hasPrev" @click="goPrev">‹ 上一份</n-button>
+          <n-button size="small" :disabled="!hasNext" @click="goNext">下一份 ›</n-button>
+          <n-popselect
+            v-model:value="currentId"
+            :options="popOptions"
+            size="medium"
+            scrollable
+            trigger="click"
+          >
+            <n-button size="small" style="margin-right: 8px">
+              {{ currentLabel }}
+            </n-button>
+          </n-popselect>
+        </n-space>
+      </div>
       <template v-if="current">
-        <div class="preview-head">
-          <div>
-            <div style="font-weight:600;color:#1e293b">{{ current.name || '未留名' }} · {{ current.position_name || current.position }}</div>
-            <div style="font-size:12px;color:#94a3b8">{{ current.school_name || '—' }} · {{ current.original }}</div>
-          </div>
-          <n-button size="small" @click="downloadOne(current.id)">下载</n-button>
+        <div class="preview-filebar">
+          <div class="file-name" :title="current.original">📄 {{ current.original }}</div>
+          <n-button size="tiny" type="primary" @click="downloadOne(current.id)">⬇ 下载</n-button>
         </div>
-        <pdf-viewer :source="api.resumePreviewUrl(current.id)" />
+        <file-viewer :source="api.resumePreviewUrl(current.id)" :filename="current.original" :resume-id="current.id" />
       </template>
       <div v-else class="preview-empty">
         <div style="font-size:40px;margin-bottom:10px">📄</div>
@@ -80,21 +85,21 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useDialog, useMessage } from 'naive-ui'
 import { api } from '../api'
-import PdfViewer from '../components/PdfViewer.vue'
+import FileViewer from '../components/FileViewer.vue'
 
 const message = useMessage()
 const dialog = useDialog()
 
-const PAGE_SIZE = 50
-const page = ref(0)          // 已加载页数（0 表示还没加载）
+const PAGE_SIZE = 20
+const page = ref(0)
 const total = ref(0)
 const items = ref([])
 const loading = ref(false)
+const finished = ref(false)
 const currentId = ref(null)
-const listBody = ref(null)
 
 const filter = reactive({ school: null, position: null, dateStart: null, dateEnd: null, keyword: '' })
 const schoolOptions = ref([])
@@ -102,6 +107,26 @@ const positionOptions = ref([])
 
 const hasMore = computed(() => items.value.length < total.value)
 const current = computed(() => items.value.find(i => i.id === currentId.value) || null)
+
+// 查看器上一份/下一份 定位
+const currentIdx = computed(() => items.value.findIndex(i => i.id === currentId.value))
+const hasPrev = computed(() => currentIdx.value > 0)
+const hasNext = computed(() => currentIdx.value >= 0 && currentIdx.value < items.value.length - 1)
+const currentLabel = computed(() => {
+  if (!current.value) return '选择简历'
+  return `${current.value.name || '未留名'} · ${current.value.position_name || current.value.position}`
+})
+// popselect 跳转选项（label 姓名·岗位，value id）
+const popOptions = computed(() =>
+  items.value.map(i => ({ label: `${i.name || '未留名'} · ${i.position_name || i.position}`, value: i.id }))
+)
+
+function goPrev() {
+  if (hasPrev.value) currentId.value = items.value[currentIdx.value - 1].id
+}
+function goNext() {
+  if (hasNext.value) currentId.value = items.value[currentIdx.value + 1].id
+}
 
 function fmtDate(v) {
   if (!v) return ''
@@ -121,36 +146,26 @@ function buildParams(offset) {
   return p
 }
 
-async function loadMore() {
-  if (loading.value) return
+async function handleLoad() {
+  if (loading.value || finished.value) return
   loading.value = true
   try {
     const offset = page.value * PAGE_SIZE
     const d = await api.listResumes(buildParams(offset))
     if (page.value === 0) {
-      // 首次加载：全新列表
       items.value = d.items
       currentId.value = d.items.length ? d.items[0].id : null
     } else {
-      // 追加
       const known = new Set(items.value.map(i => i.id))
       items.value = [...items.value, ...d.items.filter(i => !known.has(i.id))]
     }
     total.value = d.total
     page.value++
+    if (items.value.length >= total.value) finished.value = true
   } catch (e) {
-    message.error(e.message)
+    console.error(e)
   } finally {
     loading.value = false
-  }
-}
-
-function onListScroll() {
-  const el = listBody.value
-  if (!el) return
-  // 滚动到接近底部 80px 时加载更多
-  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
-    if (hasMore.value) loadMore()
   }
 }
 
@@ -158,41 +173,10 @@ function selectRow(row) {
   currentId.value = row.id
 }
 
-function doSearch() {
-  page.value = 0
-  items.value = []
-  loadMore()
-}
-function resetFilter() {
-  filter.school = null
-  filter.position = null
-  filter.dateStart = null
-  filter.dateEnd = null
-  filter.keyword = ''
-  page.value = 0
-  items.value = []
-  loadMore()
-}
-
-async function loadFilters() {
-  try {
-    const [schools, positions] = await Promise.all([api.listSchools(), api.listPositions()])
-    schoolOptions.value = schools.map(s => ({ label: s.name, value: s.name }))
-    positionOptions.value = positions.map(p => ({ label: p.name, value: p.name }))
-  } catch (e) {}
-  loadMore()
-}
-
-// ============ 操作 ============
 function downloadOne(id) {
   window.location.href = api.resumeDownloadUrl(id)
 }
-function downloadFiltered() {
-  const p = buildParams(0)
-  delete p.limit
-  delete p.offset
-  window.location.href = api.exportZipUrl(p)
-}
+
 function deleteOne(row) {
   dialog.warning({
     title: '删除简历',
@@ -206,91 +190,132 @@ function deleteOne(row) {
         if (currentId.value === row.id) currentId.value = null
         items.value = items.value.filter(i => i.id !== row.id)
         total.value--
-      } catch (e) { message.error(e.message) }
+      } catch (e) {
+        message.error(e.message)
+      }
     }
   })
 }
 
-onMounted(loadFilters)
-onBeforeUnmount(() => {})
+function doSearch() {
+  page.value = 0
+  items.value = []
+  finished.value = false
+  currentId.value = null
+  handleLoad()
+}
+function resetFilter() {
+  filter.school = null
+  filter.position = null
+  filter.dateStart = null
+  filter.dateEnd = null
+  filter.keyword = ''
+  doSearch()
+}
+
+async function loadFilters() {
+  try {
+    const [schools, positions] = await Promise.all([api.listSchools(), api.listPositions()])
+    schoolOptions.value = schools.map(s => ({ label: s.name, value: s.name }))
+    positionOptions.value = positions.map(p => ({ label: p.name, value: p.name }))
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+onMounted(() => {
+  loadFilters()
+  handleLoad()
+})
 </script>
 
 <style scoped>
 .resumes-layout {
   display: flex;
   gap: 16px;
-  height: 100%;
+  flex: 1;
   min-height: 0;
 }
 .left-pane {
-  flex: 0 0 46%;
-  max-width: 520px;
-  min-width: 340px;
+  flex: 0 0 40%;
+  max-width: 440px;
+  min-width: 300px;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-}
-.list-card {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.list-card :deep(.n-card__content) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 0 12px 12px;
-  overflow: hidden;
-}
-.list-body {
-  flex: 1;
-  overflow-y: auto;
   min-height: 0;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 4px 14px;
-  box-sizing: border-box;
+  background: #fff;
+  padding: 12px;
+}
+.left-title {
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+.resume-scroll {
+  flex: 1;
+  min-height: 0;
+  height: 0;  /* flex:1 时用 height:0 + min-height:0，让父级 flex 拉伸决定实际高度，同时使内部 .n-scrollbar 的 height:100% 可解析 */
+}
+.resume-scroll :deep(.n-scrollbar) {
+  height: 100%;
 }
 .resume-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 4px;
-  border-bottom: 1px solid #f1f5f9;
+  gap: 8px;
+  height: 52px;
+  padding: 0 12px;
+  margin-bottom: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #fff;
   cursor: pointer;
+  transition: border-color .2s, background-color .2s, box-shadow .2s;
+}
+.resume-item:last-child {
+  margin-bottom: 0;
+}
+.resume-item:hover {
+  border-color: #bfdbfe;
+  background-color: #f0f7ff;
+}
+.resume-item.item-active {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+  box-shadow: 0 0 0 1px #2563eb inset;
+}
+.item-info {
+  flex: 1;
+  min-width: 0;
+}
+.item-actions {
+  flex-shrink: 0;
+}
+.item-line1 {
   font-size: 14px;
-}
-.resume-item:last-child { border-bottom: none; }
-.resume-item:hover { background: #f8fafc; }
-.resume-item.active { background: #eff6ff; }
-.item-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #d1d5db; flex-shrink: 0;
-  transition: background .15s;
-}
-.item-dot.dot-on { background: #22c55e; }
-.item-content { flex: 1; min-width: 0; }
-.item-line1 { display: flex; align-items: center; gap: 8px; }
-.item-name { font-weight: 600; color: #1e293b; font-size: 14px; }
-.item-pos {
-  font-size: 12px; color: #2563eb; background: #eff6ff;
-  padding: 1px 8px; border-radius: 10px; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; max-width: 130px;
+  font-weight: 600;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .item-line2 {
-  font-size: 12px; color: #94a3b8; margin-top: 2px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.item-right {
-  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+.list-hint {
+  text-align: center;
+  padding: 8px 0;
+  color: #94a3b8;
+  font-size: 12px;
 }
-.item-meta { color: #94a3b8; font-size: 12px; white-space: nowrap; }
-.item-del {
-  cursor: pointer; font-size: 14px; opacity: 0.5; transition: opacity .15s;
-}
-.item-del:hover { opacity: 1; }
 
 .right-pane {
   flex: 1;
@@ -301,6 +326,34 @@ onBeforeUnmount(() => {})
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+}
+.preview-nav {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+.preview-filebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  flex-shrink: 0;
+}
+.file-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #475569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .preview-empty {
   flex: 1;
@@ -309,14 +362,5 @@ onBeforeUnmount(() => {})
   align-items: center;
   justify-content: center;
   color: #94a3b8;
-}
-.preview-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e2e8f0;
-  flex-shrink: 0;
 }
 </style>

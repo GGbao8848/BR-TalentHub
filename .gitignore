@@ -11,10 +11,9 @@ web/node_modules/
 web/dist/
 
 # 运行时数据
-data/*.db
-data/*.db-wal
-data/*.db-shm
+data/*.db*
 data/qr_preview.png
+data/resumes/
 logs/
 resumes/
 

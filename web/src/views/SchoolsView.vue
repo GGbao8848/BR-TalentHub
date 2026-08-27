@@ -6,7 +6,10 @@
           <n-input v-model:value="newName" placeholder="如：北京大学" style="width:200px" />
         </n-form-item>
         <n-form-item label="绑定岗位（可多选）">
-          <n-select v-model:value="newPositions" multiple :options="positionOptions" placeholder="该校开放招聘的岗位" clearable style="width:320px" />
+          <div style="display:flex;gap:8px;align-items:center">
+            <n-select v-model:value="newPositions" multiple :options="positionOptions" placeholder="该校开放招聘的岗位" clearable style="width:280px" />
+            <n-button size="small" @click="selectAllNewPositions">全部添加</n-button>
+          </div>
         </n-form-item>
         <n-form-item>
           <n-button type="primary" @click="addSchool">添加学校</n-button>
@@ -64,6 +67,12 @@ async function loadAll() {
   } catch (e) { message.error(e.message) }
 }
 
+function selectAllNewPositions() {
+  // 全部添加：选中所有岗位
+  if (newPositions.value.length === positionOptions.value.length) return
+  newPositions.value = positionOptions.value.map(o => o.value)
+}
+
 async function addSchool() {
   const name = newName.value.trim()
   if (!name) { message.warning('请填写学校名称'); return }
@@ -94,21 +103,47 @@ function removeSchool(s) {
 
 function openEditPositions(s) {
   let pids = s.position_ids || []
+  const allIds = positions.value.map(p => p.id)
+  let selectAll = allIds.length > 0 && allIds.every(id => pids.includes(id))
   dialog.info({
     title: `学校「${s.name}」绑定岗位`,
     showIcon: false,
     content: () => h('div', { style: 'width:100%' }, [
-      h('div', { style: 'margin-bottom:8px;color:#475569;font-size:13px' }, '选择该校开放招聘的岗位：'),
+      h('div', { style: 'margin-bottom:8px;display:flex;align-items:center;gap:8px' }, [
+        h('span', { style: 'color:#475569;font-size:13px' }, '选择该校开放招聘的岗位：'),
+        h('label', {
+          style: 'display:inline-flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;color:#2563eb'
+        }, [
+          h('input', {
+            type: 'checkbox',
+            checked: selectAll,
+            style: 'width:15px;height:15px;accent-color:#2563eb',
+            onInput: e => {
+              selectAll = e.target.checked
+              pids = selectAll ? [...allIds] : []
+              const root = e.target.closest('.n-dialog__content')
+              if (root) {
+                root.querySelectorAll('input[data-pos]').forEach(cb => {
+                  cb.checked = selectAll
+                })
+              }
+            }
+          }),
+          '全部添加'
+        ])
+      ]),
       ...positions.value.map(p => h('label', {
         style: 'display:inline-flex;align-items:center;gap:6px;margin:4px 12px 4px 0;font-size:14px;cursor:pointer'
       }, [
         h('input', {
           type: 'checkbox',
+          'data-pos': true,
           checked: pids.includes(p.id),
           style: 'width:16px;height:16px;accent-color:#2563eb',
           onInput: e => {
             if (e.target.checked) { if (!pids.includes(p.id)) pids.push(p.id) }
             else pids = pids.filter(x => x !== p.id)
+            selectAll = allIds.every(id => pids.includes(id))
           }
         }),
         p.name

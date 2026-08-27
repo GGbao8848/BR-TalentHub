@@ -13,7 +13,11 @@ from app import database as db
 
 router = APIRouter()
 
-ALLOWED_EXT = {".pdf", ".doc", ".docx"}
+ALLOWED_EXT = {
+    ".pdf", ".doc", ".docx",
+    ".md", ".markdown", ".txt", ".text",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp",
+}
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
 
 
@@ -90,7 +94,7 @@ async def upload_resume(
     original = file.filename or "resume"
     ext = Path(original).suffix.lower()
     if ext not in ALLOWED_EXT:
-        raise HTTPException(400, "仅支持 PDF / DOC / DOCX 格式")
+        raise HTTPException(400, f"不支持该文件格式：{ext}（支持 PDF / DOC / DOCX / MD / TXT / 图片）")
 
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
@@ -242,3 +246,67 @@ def download_resume(resume_id: int, inline: bool = False):
         raise HTTPException(404, "文件已丢失")
     cdt = "inline" if inline else "attachment"
     return FileResponse(path, filename=row["original"], content_disposition_type=cdt)
+
+
+@router.get("/api/resumes/{resume_id}/text")
+def resume_text(resume_id: int):
+    """提取简历文本内容（doc/docx/md/txt），供前端预览。"""
+    import subprocess
+
+    row = db.get_resume(resume_id)
+    if not row:
+        raise HTTPException(404, "记录不存在")
+    path = Path(row["filepath"])
+    if not path.exists():
+        raise HTTPException(404, "文件已丢失")
+    ext = path.suffix.lower()
+
+    if ext in (".md", ".markdown", ".txt", ".text"):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            raise HTTPException(500, "读取文件失败")
+        return {"text": text, "format": ext.lstrip(".")}
+
+    if ext == ".docx":
+        try:
+            from docx import Document
+            doc = Document(str(path))
+            paras = [p.text for p in doc.paragraphs if p.text.strip()]
+            text = "\n".join(paras) or "（未提取到文字内容）"
+            return {"text": text, "format": "docx"}
+        except Exception:
+            raise HTTPException(422, "docx 解析失败")
+
+    if ext == ".doc":
+        # 若实为 RTF（{\rtf 开头），用 striprtf 解析；否则用 catdoc 提取二进制 doc
+        raw_head = path.read_bytes()[:512].lstrip(b"\xef\xbb\xbf").lstrip()
+        if raw_head.startswith(b"{\\rtf"):
+            try:
+                from striprtf.striprtf import rtf_to_text
+                text = rtf_to_text(raw_head.decode("utf-8", errors="replace"))
+                if text.strip():
+                    return {"text": text.strip(), "format": "doc"}
+            except Exception:
+                pass
+        # 二进制 doc：用 catdoc 提取
+        for charset in ("utf-8", "gbk", "gb18030", "latin-1"):
+            try:
+                out = subprocess.run(
+                    ["catdoc", "-s", charset, str(path)],
+                    capture_output=True, timeout=30,
+                )
+                if out.returncode == 0:
+                    text = out.stdout.decode("utf-8", errors="replace").strip()
+                    if text:
+                        return {"text": text, "format": "doc"}
+            except Exception:
+                continue
+        # 退化：直接按字符串提取可读文本
+        raw = path.read_bytes()
+        text = "".join(
+            ch for ch in raw.decode("latin-1") if ch.isprintable() or ch in "\n\t"
+        ).strip()
+        return {"text": text[:5000] or "（无法提取 doc 文本）", "format": "doc"}
+
+    raise HTTPException(415, "该格式不支持文本预览")
