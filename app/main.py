@@ -5,6 +5,7 @@
 - 手机端上传：姓名/手机/岗位 + 附件（PDF/DOC/DOCX）
 - 数据落 SQLite，文件落本地目录，纯局域网本地部署，无需联网/登录
 """
+import os
 import re
 import socket
 import uuid
@@ -14,6 +15,7 @@ from pathlib import Path
 
 import qrcode
 import uvicorn
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
@@ -24,6 +26,16 @@ from app import database as db
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = BASE_DIR / "data"
+
+# 加载项目根目录的 .env（HOST/PORT/SAVE_DIR 等配置）
+load_dotenv(BASE_DIR / ".env")
+
+# 监听地址与端口：从 .env 或环境变量读取（保证管理页/二维码链接一致）
+HOST = os.environ.get("HOST", "0.0.0.0").strip() or "0.0.0.0"
+PORT = int(os.environ.get("PORT", "8000").strip() or "8000")
+# 默认简历保存目录（.env 里可覆盖为绝对路径；空值则用项目内默认）
+_env_save_dir = os.environ.get("SAVE_DIR", "").strip()
+DEFAULT_DIR = Path(_env_save_dir) if _env_save_dir else Path(DATA_DIR / "resumes")
 
 app = FastAPI(title="BR TalentHub", version="1.0.0")
 
@@ -42,8 +54,6 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 ALLOWED_EXT = {".pdf", ".doc", ".docx"}
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
-
-DEFAULT_DIR = DATA_DIR / "resumes"
 
 
 def now_str() -> str:
@@ -83,7 +93,7 @@ def get_config():
         "event_id": event_id,
         "save_dir": save_dir,
         "host_ip": get_local_ip(),
-        "port": 8000,
+        "port": PORT,
         "count": db.count_resumes(),
         "updated_at": db.get_setting("updated_at", ""),
     }
@@ -124,7 +134,7 @@ def get_stats():
 def qr_code():
     """生成二维码 PNG：指向手机上传页（携带招聘会 event_id）。
 
-    二维码指向局域网地址（http://本机IP:8000/upload?event=...）。
+    二维码指向局域网地址（http://本机IP:{PORT}/upload?event=...）。
     """
     cfg = get_config()
     base = f"http://{cfg['host_ip']}:{cfg['port']}"
@@ -233,4 +243,4 @@ def upload_page():
 
 if __name__ == "__main__":
     db.init_db()
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host=HOST, port=PORT)

@@ -4,3 +4,4 @@ qrcode
 pydantic
 python-multipart
 pillow
+python-dotenv

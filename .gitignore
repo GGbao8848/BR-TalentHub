@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 .venv/
 
+# 环境配置（含敏感/本机路径，不提交）
+.env
+
 # 运行时数据
 data/*.db
 data/*.db-wal
