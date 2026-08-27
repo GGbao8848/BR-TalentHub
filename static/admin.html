@@ -103,9 +103,7 @@
           <input type="text" id="saveDir" placeholder="如：D:\招聘会\2026-08">
           <button class="btn btn-ghost btn-sm" onclick="pickDir()">浏览</button>
         </div>
-        <label>公网访问地址（可选，填了手机在任何网络都能扫码）</label>
-        <input type="text" id="publicUrl" placeholder="如：https://xxx.trycloudflare.com">
-        <div class="savedir-hint" style="margin-top:6px">留空则使用局域网地址，仅现场同 Wi-Fi 可访问</div>
+        <div class="savedir-hint" style="margin-top:6px">手机与电脑需在同一局域网内，扫码即可上传</div>
         <button class="btn btn-primary" onclick="saveConfig()">保存并开始收集</button>
         <div class="savedir-hint" id="saveDirHint"></div>
         <div style="margin-top:16px; display:flex; gap:8px">
@@ -161,7 +159,6 @@ async function loadConfig() {
     config = await r.json();
     document.getElementById('eventName').value = config.event_name;
     document.getElementById('saveDir').value = config.save_dir;
-    document.getElementById('publicUrl').value = config.public_url || '';
     document.getElementById('saveDirHint').textContent = '当前保存目录：' + config.save_dir;
     document.getElementById('headerEvent').textContent = config.event_name;
     document.getElementById('qrUrl').textContent = getAccessUrl(config);
@@ -175,7 +172,6 @@ async function saveConfig() {
   const payload = {
     event_name: document.getElementById('eventName').value,
     save_dir: document.getElementById('saveDir').value,
-    public_url: document.getElementById('publicUrl').value,
   };
   const r = await fetch('/api/config', {
     method: 'POST',
@@ -204,8 +200,7 @@ async function loadStats() {
 }
 
 function getAccessUrl(cfg) {
-  const base = cfg.public_url || `http://${cfg.host_ip}:${cfg.port}`;
-  return `手机访问地址：${base}/upload?event=${cfg.event_id}`;
+  return `手机访问地址：http://${cfg.host_ip}:${cfg.port}/upload?event=${cfg.event_id}`;
 }
 
 function renderStats(count, ip) {

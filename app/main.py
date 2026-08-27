@@ -3,7 +3,7 @@
 第一版 MVP：
 - 管理端大屏：设置招聘会/保存目录、展示二维码、实时统计
 - 手机端上传：姓名/手机/岗位 + 附件（PDF/DOC/DOCX）
-- 数据落 SQLite，文件落本地目录，纯局域网运行，无需联网/登录
+- 数据落 SQLite，文件落本地目录，纯局域网本地部署，无需联网/登录
 """
 import re
 import socket
@@ -78,14 +78,12 @@ def get_config():
     if not db.get_setting("event_id"):
         db.set_setting("event_id", event_id)
     save_dir = db.get_setting("save_dir", str(DEFAULT_DIR))
-    public_url = db.get_setting("public_url", "").strip()
     return {
         "event_name": event_name,
         "event_id": event_id,
         "save_dir": save_dir,
         "host_ip": get_local_ip(),
         "port": 8000,
-        "public_url": public_url,  # 公网访问地址（如 https://xxx.trycloudflare.com）
         "count": db.count_resumes(),
         "updated_at": db.get_setting("updated_at", ""),
     }
@@ -109,12 +107,6 @@ def update_config(payload: dict):
 
     if "started_at" in payload:
         db.set_setting("started_at", payload["started_at"])
-    if "public_url" in payload:
-        # 规范化：去掉结尾斜杠，仅保留合法 URL
-        u = (payload["public_url"] or "").strip().rstrip("/")
-        if u and not u.startswith(("http://", "https://")):
-            u = "https://" + u
-        db.set_setting("public_url", u)
     db.set_setting("updated_at", now_str())
     return get_config()
 
@@ -132,10 +124,10 @@ def get_stats():
 def qr_code():
     """生成二维码 PNG：指向手机上传页（携带招聘会 event_id）。
 
-    优先使用配置的公网地址（public_url），否则退回局域网 IP。
+    二维码指向局域网地址（http://本机IP:8000/upload?event=...）。
     """
     cfg = get_config()
-    base = cfg["public_url"] or f"http://{cfg['host_ip']}:{cfg['port']}"
+    base = f"http://{cfg['host_ip']}:{cfg['port']}"
     url = f"{base}/upload?event={cfg['event_id']}"
     qr = qrcode.QRCode(border=2, box_size=10, error_correction=qrcode.constants.ERROR_CORRECT_M)
     qr.add_data(url)
