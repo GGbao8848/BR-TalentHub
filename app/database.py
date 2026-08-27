@@ -361,7 +361,7 @@ def dashboard_stats() -> dict:
         dict(r)
         for r in conn.execute(
             "SELECT substr(upload_time, 1, 10) AS day, COUNT(*) AS count "
-            "FROM resumes GROUP BY day ORDER BY day DESC LIMIT 7"
+            "FROM resumes GROUP BY day ORDER BY day DESC LIMIT 14"
         )
     ]
     by_day.reverse()
