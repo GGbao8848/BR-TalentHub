@@ -39,14 +39,17 @@
             :class="{ active: row.id === currentId }"
             @click="selectRow(row)"
           >
-            <div class="item-main">
-              <span class="item-name">{{ row.name || '未留名' }}</span>
-              <span class="item-pos">{{ row.position_name || row.position }}</span>
-              <span class="item-del" @click.stop="deleteOne(row)" title="删除">🗑</span>
+            <span class="item-dot" :class="{ 'dot-on': row.id === currentId }"></span>
+            <div class="item-content">
+              <div class="item-line1">
+                <span class="item-name">{{ row.name || '未留名' }}</span>
+                <span class="item-pos">{{ row.position_name || row.position }}</span>
+              </div>
+              <div class="item-line2">{{ row.original }}</div>
             </div>
-            <div class="item-sub">
-              <span>{{ row.school_name || '—' }}</span>
-              <span class="item-time">{{ (row.upload_time || '').slice(0, 16) }}</span>
+            <div class="item-right">
+              <span class="item-meta">{{ (row.upload_time || '').slice(0, 16) }} · {{ row.school_name || '—' }}</span>
+              <span class="item-del" @click.stop="deleteOne(row)" title="删除">🗑</span>
             </div>
           </div>
           <div v-if="loading" style="text-align:center;padding:12px;color:#94a3b8;font-size:13px">加载中…</div>
@@ -244,37 +247,48 @@ onBeforeUnmount(() => {})
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  margin: 0 -4px;
-  padding: 0 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 4px 14px;
 }
 .resume-item {
-  padding: 10px 12px;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  border-bottom: 1px solid #f1f5f9;
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: background .15s, border-color .15s;
-  margin-bottom: 6px;
+  font-size: 14px;
 }
-.resume-item:hover { background: #f1f5f9; }
-.resume-item.active {
-  background: #eff6ff;
-  border-color: #bfdbfe;
+.resume-item:last-child { border-bottom: none; }
+.resume-item:hover { background: #f8fafc; }
+.resume-item.active { background: #eff6ff; }
+.item-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #d1d5db; flex-shrink: 0;
+  transition: background .15s;
 }
-.item-main { display: flex; align-items: center; gap: 8px; }
-.item-name { font-weight: 600; color: #1e293b; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-dot.dot-on { background: #22c55e; }
+.item-content { flex: 1; min-width: 0; }
+.item-line1 { display: flex; align-items: center; gap: 8px; }
+.item-name { font-weight: 600; color: #1e293b; font-size: 14px; }
 .item-pos {
   font-size: 12px; color: #2563eb; background: #eff6ff;
-  padding: 2px 8px; border-radius: 10px; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; max-width: 120px; flex-shrink: 0;
+  padding: 1px 8px; border-radius: 10px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; max-width: 130px;
 }
+.item-line2 {
+  font-size: 12px; color: #94a3b8; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.item-right {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.item-meta { color: #94a3b8; font-size: 12px; white-space: nowrap; }
 .item-del {
-  margin-left: auto; cursor: pointer; font-size: 14px; opacity: 0.5; flex-shrink: 0;
-  transition: opacity .15s;
+  cursor: pointer; font-size: 14px; opacity: 0.5; transition: opacity .15s;
 }
 .item-del:hover { opacity: 1; }
-.item-sub { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
-.item-sub span { font-size: 12px; color: #94a3b8; }
-.item-time { flex-shrink: 0; }
 
 .right-pane {
   flex: 1;
