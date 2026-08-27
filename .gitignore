@@ -6,6 +6,10 @@ __pycache__/
 # 环境配置（含敏感/本机路径，不提交）
 .env
 
+# 前端构建产物与依赖
+web/node_modules/
+web/dist/
+
 # 运行时数据
 data/*.db
 data/*.db-wal
@@ -18,3 +22,4 @@ resumes/
 Thumbs.db
 .DS_Store
 test_full.py
+.zcode/

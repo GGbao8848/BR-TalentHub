@@ -1,74 +1,104 @@
 # BR Tech · 招聘会简历收集系统
 
-第一版（MVP）：招聘会现场用电脑大屏展示二维码，求职者手机扫码上传简历，文件直接落盘到本地指定文件夹。**纯局域网本地部署**，无需联网、无需任何外部服务。
+招聘会现场用电脑大屏展示二维码，求职者手机扫码上传简历，文件直接落盘到本地指定文件夹。**纯局域网本地部署**，无需联网、无需任何外部服务。
+
+前端基于 **Vue 3 + Naive UI**（Vite 构建），后端基于 **FastAPI + SQLite**。
 
 ## 快速开始
 
-双击 `run.bat`，首次运行会自动创建虚拟环境（venv）并安装依赖，然后启动服务。
+### 后端（FastAPI）
 
-- 管理端大屏：<http://localhost:8000>
-- 手机上传页：<http://localhost:8000/upload>
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+cp .env.example .env   # 按需修改 HOST / PORT / SAVE_DIR
+.venv/bin/python -m app.main
+```
 
-手机与电脑需连接**同一个局域网**，扫码上方二维码即可上传。电脑防火墙需放行 8000 端口。
+### 前端（Vite + Vue3 + Naive UI）
+
+```bash
+cd web
+npm install
+npm run build        # 产物输出到 web/dist，由后端 FastAPI 托管
+```
+
+> 后端启动时会自动托管 `web/dist` 构建产物（`/` 管理端、`/upload` 手机上传页）。
+> 开发时可用 `npm run dev` 启动 Vite dev server（已配置代理 `/api` 到后端 `:18540`）。
+
+### 访问地址
+
+- 管理端大屏：<http://localhost:18540>
+- 手机上传页：<http://localhost:18540/upload>
+
+手机与电脑需连接**同一个局域网**，扫码即可上传。电脑防火墙需放行对应端口。
 
 ## 使用流程
 
-1. **设置招聘会**：填名称、填简历保存目录（如 `D:\招聘会\2026-08-25`），点保存
-2. **展示二维码**：大屏自动显示二维码，手机扫码进入上传页
+1. **设置招聘会**：填名称、填简历保存目录，点保存
+2. **展示二维码**：大屏自动显示二维码（可切换当前学校），手机扫码进入上传页
 3. **实时统计**：大屏每 3 秒刷新，显示已收简历数 + 最近上传记录
-4. **结束收场**：点「结束本场 / 清空计数」开始新一场（已收文件不删除）
+4. **简历管理**：按学校/岗位/日期段/关键词筛选，查看/下载/删除，批量导出 ZIP
+5. **结束收场**：点「开始新一场」换新 event_id（已收文件不删除）
 
 ## 技术栈
 
 | 层 | 选型 |
 |---|---|
-| 后端 | Python + FastAPI + Uvicorn |
+| 后端 | Python + FastAPI + Uvicorn（Routers 模块化 + Pydantic 模型） |
+| 前端 | Vue 3 + Naive UI + Vue Router（Vite 构建） |
 | 存储 | SQLite（`data/br_talenthub.db`） |
-| 文件 | 本地文件系统（保存目录下，自动按时间戳+随机串重命名） |
+| 文件 | 本地文件系统（按 学校/岗位/文件名 三级目录） |
 | 二维码 | qrcode + Pillow（本地生成，无需外网） |
-| 前端 | 原生 HTML/JS（零构建，单进程，现场电脑无需装 Node） |
-| 部署 | Windows 原生，双击运行 |
+| 部署 | Linux systemd / Windows，双端一键启动 |
 
 ## 项目结构
 
 ```
 BR_ResumeCollect/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py        # FastAPI 应用：路由、二维码、上传、配置
-│   └── database.py    # SQLite 数据层
-├── static/
-│   ├── admin.html     # 管理端大屏
-│   └── upload.html    # 手机上传页
-├── data/              # SQLite 数据库 + 二维码图片（运行时生成）
-├── resumes/           # 默认简历保存目录
-├── logs/              # 服务日志
+│   ├── main.py              # 应用入口：路由挂载、静态托管
+│   ├── schemas.py           # Pydantic 请求/响应模型
+│   ├── database.py          # SQLite 数据层
+│   └── routers/             # 模块化 API 路由
+│       ├── config.py        # 配置/统计/二维码/event
+│       ├── positions.py     # 岗位管理 + Excel 导入
+│       ├── schools.py       # 学校管理 + 绑定岗位 + 二维码
+│       ├── resumes.py       # 简历上传/列表/删除/导出
+│       └── dashboard.py     # 数据看板
+├── web/                     # 前端工程（Vite + Vue3 + Naive UI）
+│   ├── src/views/           # 管理端5个视图 + 上传页
+│   └── dist/                # 构建产物（后端托管）
+├── data/                    # SQLite 数据库 + 简历文件
 ├── requirements.txt
-├── run.bat            # 一键启动
-└── README.md
+└── .env / .env.example      # 服务配置（HOST/PORT/SAVE_DIR）
 ```
 
 ## 主要 API
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/config` | 当前招聘会配置 + 局域网地址 + 统计 |
-| POST | `/api/config` | 设置招聘会名称 / 保存目录 |
+| GET/POST | `/api/config` | 招聘会配置 + 局域网地址 + 统计 |
 | GET | `/api/stats` | 实时统计（总数 + 最近上传） |
-| GET | `/api/qrcode` | 生成二维码 PNG（指向局域网地址） |
+| GET | `/api/qrcode` | 生成二维码 PNG（可指定学校） |
+| GET/POST/PUT/DELETE | `/api/positions*` | 岗位增删改查 + Excel 导入 |
+| GET/POST/DELETE | `/api/schools*` | 学校管理、绑定岗位、激活 |
 | POST | `/api/resumes/upload` | 手机上传简历（multipart） |
-| GET | `/api/resumes` | 上传记录列表 |
-| GET | `/api/resumes/{id}/download` | 下载原始简历 |
-| POST | `/api/event/reset` | 开始新一场（换 event_id + 清计数） |
+| GET | `/api/resumes` | 简历列表（筛选 + 分页） |
+| DELETE | `/api/resumes/{id}` | 删除简历（含磁盘文件） |
+| GET | `/api/resumes/export.zip` | 按筛选条件打包下载 ZIP |
+| GET | `/api/resumes/{id}/download` | 下载单条简历 |
+| GET | `/api/dashboard` | 看板统计（学校/岗位/近14日） |
+| POST | `/api/event/reset` | 开始新一场（换 event_id） |
 
 ## 现场注意事项
 
-- 手机和电脑必须连同一个局域网，电脑防火墙需放行 8000 端口
+- 手机和电脑必须连同一个局域网，电脑防火墙需放行端口
 - 简历数据只存在于本地电脑，不上云、不经过任何第三方服务
 - 只允许 PDF / DOC / DOCX，单文件 ≤ 20MB
 
-## 后续规划（第二版起）
+## 后续规划
 
-- 招聘会管理（多场并存、历史记录）
-- Excel 导出上传记录
-- AI 简历解析（对接 JD / 面试资料，扩展为 BR 招聘数据平台）
+- 简历内容智能筛选（AI 解析简历正文，按技能/关键词匹配岗位）
+- Excel 导出简历汇总表
+- 上传时自动备份到云端（R2），防本地电脑故障丢数据
