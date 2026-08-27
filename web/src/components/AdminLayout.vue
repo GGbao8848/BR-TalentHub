@@ -32,8 +32,10 @@
                   @update:value="onMenuChange"
                 />
               </n-layout-sider>
-              <n-layout content-style="padding:24px;background:#f5f7fa;height:100%;overflow-y:auto">
-                <router-view />
+              <n-layout content-style="padding:24px;background:#f5f7fa;height:100%;overflow:hidden;display:flex">
+                <div style="flex:1;min-height:0;overflow-y:auto">
+                  <router-view />
+                </div>
               </n-layout>
             </n-layout>
           </n-layout>

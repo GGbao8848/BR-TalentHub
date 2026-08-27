@@ -219,8 +219,8 @@ onBeforeUnmount(() => {})
 .resumes-layout {
   display: flex;
   gap: 16px;
-  height: calc(100vh - 56px - 48px);
-  min-height: 480px;
+  height: 100%;
+  min-height: 0;
 }
 .left-pane {
   flex: 0 0 46%;
@@ -241,7 +241,8 @@ onBeforeUnmount(() => {})
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding-top: 8px;
+  padding: 0 12px 12px;
+  overflow: hidden;
 }
 .list-body {
   flex: 1;
@@ -250,6 +251,7 @@ onBeforeUnmount(() => {})
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 4px 14px;
+  box-sizing: border-box;
 }
 .resume-item {
   display: flex;
