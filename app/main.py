@@ -1,4 +1,4 @@
-"""BR TalentHub 招聘会简历收集系统 —— FastAPI 后端。
+"""BR Tech 招聘会简历收集系统 —— FastAPI 后端。
 
 第二版：
 - 岗位管理：增删 + Excel 导入（识别"岗位名称/岗位要求"表头）
@@ -41,7 +41,7 @@ PORT = int(os.environ.get("PORT", "8000").strip() or "8000")
 _env_save_dir = os.environ.get("SAVE_DIR", "").strip()
 DEFAULT_DIR = Path(_env_save_dir) if _env_save_dir else Path(DATA_DIR / "resumes")
 
-app = FastAPI(title="BR TalentHub", version="2.0.0")
+app = FastAPI(title="BR Tech", version="2.0.0")
 
 # 应用启动时确保数据表存在
 db.init_db()
@@ -98,7 +98,7 @@ def build_qr(url: str) -> Response:
 @app.get("/api/config")
 def get_config():
     """管理端/上传页共用：当前招聘会配置 + 局域网地址 + 统计。"""
-    event_name = db.get_setting("event_name", "BR 招聘会")
+    event_name = db.get_setting("event_name", "江苏北人智能制造科技股份有限公司")
     event_id = db.get_setting("event_id", gen_event_id())
     if not db.get_setting("event_id"):
         db.set_setting("event_id", event_id)

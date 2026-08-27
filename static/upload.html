@@ -147,10 +147,11 @@ schoolName = params.get('school') || '';
   try {
     const r = await fetch('/api/config');
     const d = await r.json();
-    // 标题：有学校则 "XX学校 BR 招聘会"，否则 "BR 招聘会"
+    // 标题：有学校则 "学校 · 公司名"，否则显示公司名
+    const company = d.event_name || '江苏北人智能制造科技股份有限公司';
     document.getElementById('eventTitle').textContent = schoolName
-      ? `${schoolName} BR 招聘会`
-      : d.event_name || 'BR 招聘会';
+      ? `${schoolName} · ${company}`
+      : company;
     document.getElementById('eventSub').textContent = schoolName
       ? '请填写信息并上传简历'
       : '请填写信息并上传简历';
