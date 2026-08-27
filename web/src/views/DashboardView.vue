@@ -21,7 +21,7 @@
       </n-grid-item>
     </n-grid>
 
-    <n-grid cols="1 s:2 l:3" :x-gap="16" :y-gap="16">
+    <n-grid :cols="3" :x-gap="16" :y-gap="16" responsive="screen">
       <n-grid-item>
         <n-card title="按学校统计">
           <div v-if="!dash.by_school || !dash.by_school.length" class="empty">暂无数据</div>

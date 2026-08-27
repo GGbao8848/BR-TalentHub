@@ -1,15 +1,17 @@
 <template>
   <div>
     <n-card title="新增岗位" style="margin-bottom:16px">
-      <n-space align="end" style="flex-wrap:wrap">
-        <n-form-item label="岗位名称" style="min-width:220px">
-          <n-input v-model:value="newName" placeholder="如：机器人焊接工程师" />
+      <n-form inline label-placement="left" :show-feedback="false" style="row-gap:12px">
+        <n-form-item label="岗位名称">
+          <n-input v-model:value="newName" placeholder="如：机器人焊接工程师" style="width:220px" />
         </n-form-item>
-        <n-form-item label="岗位要求" style="min-width:260px">
-          <n-input v-model:value="newRequirement" placeholder="选填，岗位职责/要求" />
+        <n-form-item label="岗位要求">
+          <n-input v-model:value="newRequirement" placeholder="选填，岗位职责/要求" style="width:260px" />
         </n-form-item>
-        <n-button type="primary" @click="addPosition">添加岗位</n-button>
-      </n-space>
+        <n-form-item>
+          <n-button type="primary" @click="addPosition">添加岗位</n-button>
+        </n-form-item>
+      </n-form>
     </n-card>
 
     <n-card title="Excel 导入岗位" style="margin-bottom:16px">

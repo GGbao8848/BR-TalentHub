@@ -1,6 +1,6 @@
 <template>
   <div class="resumes-layout">
-    <!-- 左栏：筛选 + 列表 -->
+    <!-- 左栏：筛选 + 列表（懒加载） -->
     <div class="left-pane">
       <n-card size="small" title="筛选" style="margin-bottom:12px">
         <n-space vertical size="small">
@@ -25,14 +25,12 @@
           <div style="display:flex;align-items:center;justify-content:space-between">
             <span>简历列表（{{ total }}）</span>
             <n-space size="4">
-              <n-button size="tiny" :disabled="!selectedIds.length" @click="downloadSelected">⬇ 所选</n-button>
-              <n-button size="tiny" @click="downloadFiltered">⬇ 全部</n-button>
-              <n-button size="tiny" type="error" :disabled="!selectedIds.length" @click="deleteSelected">删除所选</n-button>
+              <n-button size="tiny" @click="downloadFiltered">⬇ 导出</n-button>
             </n-space>
           </div>
         </template>
 
-        <div class="list-body">
+        <div class="list-body" ref="listBody" @scroll="onListScroll">
           <n-empty v-if="!items.length && !loading" description="暂无简历" style="padding:30px 0" />
           <div
             v-for="row in items"
@@ -44,75 +42,62 @@
             <div class="item-main">
               <span class="item-name">{{ row.name || '未留名' }}</span>
               <span class="item-pos">{{ row.position_name || row.position }}</span>
+              <span class="item-del" @click.stop="deleteOne(row)" title="删除">🗑</span>
             </div>
             <div class="item-sub">
               <span>{{ row.school_name || '—' }}</span>
               <span class="item-time">{{ (row.upload_time || '').slice(0, 16) }}</span>
             </div>
           </div>
+          <div v-if="loading" style="text-align:center;padding:12px;color:#94a3b8;font-size:13px">加载中…</div>
+          <div v-if="!loading && hasMore" style="text-align:center;padding:8px;color:#94a3b8;font-size:12px">下滑加载更多</div>
+          <div v-if="!loading && !hasMore && items.length" style="text-align:center;padding:8px;color:#cbd5e1;font-size:12px">已加载全部</div>
         </div>
-
-        <n-pagination
-          v-if="total > PAGE_SIZE"
-          size="small"
-          :page="page"
-          :page-count="totalPages"
-          @update:page="onPageChange"
-          style="justify-content:center;margin-top:10px"
-        />
       </n-card>
     </div>
 
-    <!-- 右栏：简历预览 -->
+    <!-- 右栏：PDF 查看器 -->
     <div class="right-pane">
-      <div v-if="!current" class="preview-empty">
-        <div style="font-size:40px;margin-bottom:10px">📄</div>
-        <div style="color:#94a3b8">从左侧选择一条简历，在此预览</div>
-      </div>
-      <template v-else>
+      <template v-if="current">
         <div class="preview-head">
           <div>
             <div style="font-weight:600;color:#1e293b">{{ current.name || '未留名' }} · {{ current.position_name || current.position }}</div>
             <div style="font-size:12px;color:#94a3b8">{{ current.school_name || '—' }} · {{ current.original }}</div>
           </div>
-          <n-space size="8">
-            <n-button size="small" @click="downloadOne(current.id)">下载</n-button>
-            <n-button size="small" type="error" @click="deleteOne(current)">删除</n-button>
-          </n-space>
+          <n-button size="small" @click="downloadOne(current.id)">下载</n-button>
         </div>
-        <iframe
-          v-if="current"
-          :key="'pdf-' + current.id"
-          class="preview-frame"
-          :src="api.resumePreviewUrl(current.id)"
-        />
+        <pdf-viewer :source="api.resumePreviewUrl(current.id)" />
       </template>
+      <div v-else class="preview-empty">
+        <div style="font-size:40px;margin-bottom:10px">📄</div>
+        <div style="color:#94a3b8">从左侧选择一条简历，在此查看</div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useDialog, useMessage } from 'naive-ui'
 import { api } from '../api'
+import PdfViewer from '../components/PdfViewer.vue'
 
 const message = useMessage()
 const dialog = useDialog()
 
-const PAGE_SIZE = 20
-const page = ref(1)
+const PAGE_SIZE = 50
+const page = ref(0)          // 已加载页数（0 表示还没加载）
 const total = ref(0)
 const items = ref([])
 const loading = ref(false)
 const currentId = ref(null)
-const checkedRowKeys = ref([])
-const selectedIds = ref([])
+const listBody = ref(null)
 
 const filter = reactive({ school: null, position: null, dateStart: null, dateEnd: null, keyword: '' })
 const schoolOptions = ref([])
 const positionOptions = ref([])
 
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
+const hasMore = computed(() => items.value.length < total.value)
 const current = computed(() => items.value.find(i => i.id === currentId.value) || null)
 
 function fmtDate(v) {
@@ -121,7 +106,7 @@ function fmtDate(v) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function buildParams() {
+function buildParams(offset) {
   const p = {}
   if (filter.school) p.school = filter.school
   if (filter.position) p.position = filter.position
@@ -129,28 +114,61 @@ function buildParams() {
   if (filter.dateEnd) p.date_end = fmtDate(filter.dateEnd)
   if (filter.keyword) p.keyword = filter.keyword
   p.limit = PAGE_SIZE
-  p.offset = (page.value - 1) * PAGE_SIZE
+  p.offset = offset
   return p
 }
 
-async function loadResumes() {
+async function loadMore() {
+  if (loading.value) return
   loading.value = true
   try {
-    const d = await api.listResumes(buildParams())
-    items.value = d.items
+    const offset = page.value * PAGE_SIZE
+    const d = await api.listResumes(buildParams(offset))
+    if (page.value === 0) {
+      // 首次加载：全新列表
+      items.value = d.items
+      currentId.value = d.items.length ? d.items[0].id : null
+    } else {
+      // 追加
+      const known = new Set(items.value.map(i => i.id))
+      items.value = [...items.value, ...d.items.filter(i => !known.has(i.id))]
+    }
     total.value = d.total
-    // 若当前选中的行被翻页过滤掉，清空选中
-    if (currentId.value && !items.value.find(i => i.id === currentId.value)) {
-      currentId.value = null
-    }
-    if (!currentId.value && items.value.length) {
-      currentId.value = items.value[0].id
-    }
+    page.value++
   } catch (e) {
     message.error(e.message)
   } finally {
     loading.value = false
   }
+}
+
+function onListScroll() {
+  const el = listBody.value
+  if (!el) return
+  // 滚动到接近底部 80px 时加载更多
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
+    if (hasMore.value) loadMore()
+  }
+}
+
+function selectRow(row) {
+  currentId.value = row.id
+}
+
+function doSearch() {
+  page.value = 0
+  items.value = []
+  loadMore()
+}
+function resetFilter() {
+  filter.school = null
+  filter.position = null
+  filter.dateStart = null
+  filter.dateEnd = null
+  filter.keyword = ''
+  page.value = 0
+  items.value = []
+  loadMore()
 }
 
 async function loadFilters() {
@@ -159,38 +177,15 @@ async function loadFilters() {
     schoolOptions.value = schools.map(s => ({ label: s.name, value: s.name }))
     positionOptions.value = positions.map(p => ({ label: p.name, value: p.name }))
   } catch (e) {}
-  loadResumes()
-}
-
-function selectRow(row) {
-  currentId.value = row.id
-}
-
-function doSearch() { page.value = 1; loadResumes() }
-function resetFilter() {
-  filter.school = null
-  filter.position = null
-  filter.dateStart = null
-  filter.dateEnd = null
-  filter.keyword = ''
-  page.value = 1
-  loadResumes()
-}
-function onPageChange(p) {
-  page.value = p
-  loadResumes()
+  loadMore()
 }
 
 // ============ 操作 ============
 function downloadOne(id) {
   window.location.href = api.resumeDownloadUrl(id)
 }
-function downloadSelected() {
-  if (!selectedIds.value.length) { message.warning('请先勾选简历'); return }
-  window.location.href = api.exportZipUrl({ ids: selectedIds.value.join(',') })
-}
 function downloadFiltered() {
-  const p = buildParams()
+  const p = buildParams(0)
   delete p.limit
   delete p.offset
   window.location.href = api.exportZipUrl(p)
@@ -206,30 +201,15 @@ function deleteOne(row) {
         await api.deleteResume(row.id)
         message.success('已删除')
         if (currentId.value === row.id) currentId.value = null
-        loadResumes()
-      } catch (e) { message.error(e.message) }
-    }
-  })
-}
-function deleteSelected() {
-  const ids = selectedIds.value
-  if (!ids.length) { message.warning('请先勾选简历'); return }
-  dialog.warning({
-    title: '批量删除',
-    content: `确定删除所选 ${ids.length} 条简历及文件？`,
-    positiveText: '删除',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      try {
-        for (const id of ids) await api.deleteResume(id)
-        message.success('已删除所选简历')
-        loadResumes()
+        items.value = items.value.filter(i => i.id !== row.id)
+        total.value--
       } catch (e) { message.error(e.message) }
     }
   })
 }
 
 onMounted(loadFilters)
+onBeforeUnmount(() => {})
 </script>
 
 <style scoped>
@@ -281,12 +261,17 @@ onMounted(loadFilters)
   border-color: #bfdbfe;
 }
 .item-main { display: flex; align-items: center; gap: 8px; }
-.item-name { font-weight: 600; color: #1e293b; font-size: 14px; }
+.item-name { font-weight: 600; color: #1e293b; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-pos {
   font-size: 12px; color: #2563eb; background: #eff6ff;
   padding: 2px 8px; border-radius: 10px; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; max-width: 140px;
+  text-overflow: ellipsis; white-space: nowrap; max-width: 120px; flex-shrink: 0;
 }
+.item-del {
+  margin-left: auto; cursor: pointer; font-size: 14px; opacity: 0.5; flex-shrink: 0;
+  transition: opacity .15s;
+}
+.item-del:hover { opacity: 1; }
 .item-sub { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
 .item-sub span { font-size: 12px; color: #94a3b8; }
 .item-time { flex-shrink: 0; }
@@ -317,12 +302,5 @@ onMounted(loadFilters)
   padding: 12px 16px;
   border-bottom: 1px solid #e2e8f0;
   flex-shrink: 0;
-}
-.preview-frame {
-  flex: 1;
-  width: 100%;
-  border: none;
-  min-height: 0;
-  background: #fff;
 }
 </style>

@@ -2,17 +2,22 @@
   <div>
     <!-- 招聘会设置 -->
     <n-card title="招聘会设置" style="margin-bottom:16px">
-      <n-space align="end" style="flex-wrap:wrap">
-        <n-form-item label="招聘会名称" style="min-width:260px">
-          <n-input v-model:value="eventName" placeholder="如：2026 招聘会" />
+      <n-form inline label-placement="left" :show-feedback="false" style="row-gap:12px">
+        <n-form-item label="招聘会名称">
+          <n-input v-model:value="eventName" placeholder="如：2026 招聘会" style="width:220px" />
         </n-form-item>
-        <n-form-item label="简历保存目录" style="min-width:260px">
-          <n-input v-model:value="saveDir" placeholder="如：D:\招聘会\2026" />
+        <n-form-item label="简历存储路径">
+          <n-input v-model:value="saveDir" placeholder="如：D:\招聘会\2026" style="width:220px" />
         </n-form-item>
-        <n-button type="primary" size="large" @click="saveConfig">保存</n-button>
-        <n-button type="error" size="large" ghost @click="resetEvent">开始新一场</n-button>
-      </n-space>
-      <div style="color:#94a3b8;font-size:12px;margin-top:8px">当前保存目录：{{ saveDir }}</div>
+        <n-form-item label="切换学校">
+          <n-select v-model:value="activeSchool" :options="schoolOptions" placeholder="选择当前学校" style="width:180px" @update:value="switchActiveSchool" />
+        </n-form-item>
+        <n-form-item>
+          <n-button type="primary" @click="saveConfig">保存</n-button>
+          <n-button type="error" ghost style="margin-left:8px" @click="resetEvent">开始新一场</n-button>
+        </n-form-item>
+      </n-form>
+      <div style="color:#94a3b8;font-size:12px">当前存储路径：{{ saveDir }}</div>
     </n-card>
 
     <!-- 现场扫码 -->
@@ -29,10 +34,6 @@
 
         <!-- 右栏 -->
         <div style="flex:1;min-width:280px">
-          <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#f8fafc;border-radius:10px;margin-bottom:16px">
-            <span style="color:#64748b;font-size:13px">切换学校</span>
-            <n-select v-model:value="activeSchool" :options="schoolOptions" style="flex:1" @update:value="switchActiveSchool" />
-          </div>
           <n-grid :cols="2" :x-gap="12" style="margin-bottom:16px">
             <n-grid-item>
               <n-card embedded size="small" style="text-align:center">

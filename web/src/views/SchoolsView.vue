@@ -1,15 +1,17 @@
 <template>
   <div>
     <n-card title="新增学校" style="margin-bottom:16px">
-      <n-space align="end" style="flex-wrap:wrap">
-        <n-form-item label="学校名称" style="min-width:220px">
-          <n-input v-model:value="newName" placeholder="如：北京大学" />
+      <n-form inline label-placement="left" :show-feedback="false" style="row-gap:12px">
+        <n-form-item label="学校名称">
+          <n-input v-model:value="newName" placeholder="如：北京大学" style="width:200px" />
         </n-form-item>
-        <n-form-item label="绑定岗位（可多选）" style="min-width:300px">
-          <n-select v-model:value="newPositions" multiple :options="positionOptions" placeholder="该校开放招聘的岗位" clearable />
+        <n-form-item label="绑定岗位（可多选）">
+          <n-select v-model:value="newPositions" multiple :options="positionOptions" placeholder="该校开放招聘的岗位" clearable style="width:320px" />
         </n-form-item>
-        <n-button type="primary" @click="addSchool">添加学校</n-button>
-      </n-space>
+        <n-form-item>
+          <n-button type="primary" @click="addSchool">添加学校</n-button>
+        </n-form-item>
+      </n-form>
     </n-card>
 
     <n-card :title="`学校列表（${schools.length}）· 每校独立二维码`">
