@@ -228,11 +228,17 @@ def export_resumes(
 
 
 @router.get("/api/resumes/{resume_id}/download")
-def download_resume(resume_id: int):
+def download_resume(resume_id: int, inline: bool = False):
+    """下载单条简历。
+
+    inline=1 时返回 Content-Disposition: inline，浏览器可直接内嵌预览 PDF
+    （前端"查看简历"用），否则为附件下载。
+    """
     row = db.get_resume(resume_id)
     if not row:
         raise HTTPException(404, "记录不存在")
     path = Path(row["filepath"])
     if not path.exists():
         raise HTTPException(404, "文件已丢失")
-    return FileResponse(path, filename=row["original"])
+    cdt = "inline" if inline else "attachment"
+    return FileResponse(path, filename=row["original"], content_disposition_type=cdt)

@@ -64,6 +64,7 @@ export const api = {
   listResumes: (params) => request('/api/resumes?' + new URLSearchParams(params)),
   deleteResume: (id) => request('/api/resumes/' + id, { method: 'DELETE' }),
   resumeDownloadUrl: (id) => `/api/resumes/${id}/download`,
+  resumePreviewUrl: (id) => `/api/resumes/${id}/download?inline=1`,
   exportZipUrl: (params) => '/api/resumes/export.zip?' + new URLSearchParams(params),
   uploadResume: (formData) => request('/api/resumes/upload', { method: 'POST', body: formData }),
 

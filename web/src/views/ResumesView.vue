@@ -1,73 +1,99 @@
 <template>
-  <div>
-    <!-- 筛选 -->
-    <n-card title="筛选" style="margin-bottom:16px">
-      <n-space align="end" style="flex-wrap:wrap">
-        <n-form-item label="学校" style="min-width:160px">
-          <n-select v-model:value="filter.school" :options="schoolOptions" clearable placeholder="全部学校" />
-        </n-form-item>
-        <n-form-item label="岗位" style="min-width:160px">
-          <n-select v-model:value="filter.position" :options="positionOptions" clearable placeholder="全部岗位" />
-        </n-form-item>
-        <n-form-item label="开始日期" style="min-width:150px">
-          <n-date-picker v-model:value="filter.dateStart" type="date" clearable style="width:100%" />
-        </n-form-item>
-        <n-form-item label="结束日期" style="min-width:150px">
-          <n-date-picker v-model:value="filter.dateEnd" type="date" clearable style="width:100%" />
-        </n-form-item>
-        <n-form-item label="关键词" style="min-width:160px">
-          <n-input v-model:value="filter.keyword" placeholder="姓名 / 手机 / 文件名" clearable @keyup.enter="doSearch" />
-        </n-form-item>
-        <n-button type="primary" @click="doSearch">查询</n-button>
-        <n-button @click="resetFilter">重置</n-button>
-      </n-space>
-    </n-card>
-
-    <!-- 列表 -->
-    <n-card>
-      <template #header>
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <span>简历列表（{{ total }}）</span>
+  <div class="resumes-layout">
+    <!-- 左栏：筛选 + 列表 -->
+    <div class="left-pane">
+      <n-card size="small" title="筛选" style="margin-bottom:12px">
+        <n-space vertical size="small">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <n-select v-model:value="filter.school" :options="schoolOptions" clearable placeholder="全部学校" size="small" />
+            <n-select v-model:value="filter.position" :options="positionOptions" clearable placeholder="全部岗位" size="small" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <n-date-picker v-model:value="filter.dateStart" type="date" clearable size="small" placeholder="开始日期" />
+            <n-date-picker v-model:value="filter.dateEnd" type="date" clearable size="small" placeholder="结束日期" />
+          </div>
+          <n-input v-model:value="filter.keyword" placeholder="姓名 / 手机 / 文件名" clearable size="small" @keyup.enter="doSearch" />
           <n-space>
-            <n-button size="small" type="success" :disabled="!selectedIds.length" @click="downloadSelected">⬇ 下载所选（ZIP）</n-button>
-            <n-button size="small" type="success" @click="downloadFiltered">⬇ 下载当前筛选全部</n-button>
-            <n-button size="small" :disabled="!selectedIds.length" @click="deleteSelected">删除所选</n-button>
+            <n-button size="small" type="primary" block @click="doSearch">查询</n-button>
+            <n-button size="small" @click="resetFilter">重置</n-button>
+          </n-space>
+        </n-space>
+      </n-card>
+
+      <n-card size="small" class="list-card">
+        <template #header>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span>简历列表（{{ total }}）</span>
+            <n-space size="4">
+              <n-button size="tiny" :disabled="!selectedIds.length" @click="downloadSelected">⬇ 所选</n-button>
+              <n-button size="tiny" @click="downloadFiltered">⬇ 全部</n-button>
+              <n-button size="tiny" type="error" :disabled="!selectedIds.length" @click="deleteSelected">删除所选</n-button>
+            </n-space>
+          </div>
+        </template>
+
+        <div class="list-body">
+          <n-empty v-if="!items.length && !loading" description="暂无简历" style="padding:30px 0" />
+          <div
+            v-for="row in items"
+            :key="row.id"
+            class="resume-item"
+            :class="{ active: row.id === currentId }"
+            @click="selectRow(row)"
+          >
+            <div class="item-main">
+              <span class="item-name">{{ row.name || '未留名' }}</span>
+              <span class="item-pos">{{ row.position_name || row.position }}</span>
+            </div>
+            <div class="item-sub">
+              <span>{{ row.school_name || '—' }}</span>
+              <span class="item-time">{{ (row.upload_time || '').slice(0, 16) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <n-pagination
+          v-if="total > PAGE_SIZE"
+          size="small"
+          :page="page"
+          :page-count="totalPages"
+          @update:page="onPageChange"
+          style="justify-content:center;margin-top:10px"
+        />
+      </n-card>
+    </div>
+
+    <!-- 右栏：简历预览 -->
+    <div class="right-pane">
+      <div v-if="!current" class="preview-empty">
+        <div style="font-size:40px;margin-bottom:10px">📄</div>
+        <div style="color:#94a3b8">从左侧选择一条简历，在此预览</div>
+      </div>
+      <template v-else>
+        <div class="preview-head">
+          <div>
+            <div style="font-weight:600;color:#1e293b">{{ current.name || '未留名' }} · {{ current.position_name || current.position }}</div>
+            <div style="font-size:12px;color:#94a3b8">{{ current.school_name || '—' }} · {{ current.original }}</div>
+          </div>
+          <n-space size="8">
+            <n-button size="small" @click="downloadOne(current.id)">下载</n-button>
+            <n-button size="small" type="error" @click="deleteOne(current)">删除</n-button>
           </n-space>
         </div>
+        <iframe
+          v-if="current"
+          :key="'pdf-' + current.id"
+          class="preview-frame"
+          :src="api.resumePreviewUrl(current.id)"
+        />
       </template>
-
-      <n-data-table
-        :columns="columns"
-        :data="items"
-        :pagination="pagination"
-        :row-key="rowKey"
-        :checked-row-keys="checkedRowKeys"
-        @update:checked-row-keys="onChecked"
-        @update:page="onPageChange"
-        :loading="loading"
-      />
-    </n-card>
-
-    <!-- 预览弹窗 -->
-    <n-modal v-model:show="previewShow" preset="card" style="width:900px;max-width:95vw;height:90vh">
-      <template #header>
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <span>{{ previewTitle }}</span>
-        </div>
-      </template>
-      <iframe v-if="previewIsPdf" :src="previewUrl" style="width:100%;height:100%;border:none" />
-      <n-empty v-else description="该文件不是 PDF，无法在线预览" style="padding:40px 0">
-        <template #extra>
-          <n-button type="primary" @click="downloadPreview">点击下载查看</n-button>
-        </template>
-      </n-empty>
-    </n-modal>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, h, onMounted } from 'vue'
-import { NButton, NTag, NSpace, useDialog, useMessage } from 'naive-ui'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useDialog, useMessage } from 'naive-ui'
 import { api } from '../api'
 
 const message = useMessage()
@@ -78,6 +104,7 @@ const page = ref(1)
 const total = ref(0)
 const items = ref([])
 const loading = ref(false)
+const currentId = ref(null)
 const checkedRowKeys = ref([])
 const selectedIds = ref([])
 
@@ -85,49 +112,13 @@ const filter = reactive({ school: null, position: null, dateStart: null, dateEnd
 const schoolOptions = ref([])
 const positionOptions = ref([])
 
-// 预览
-const previewShow = ref(false)
-const previewUrl = ref('')
-const previewIsPdf = ref(false)
-const previewTitle = ref('')
-
-function rowKey(row) { return row.id }
-
-const columns = [
-  { type: 'selection' },
-  { title: 'ID', key: 'id', width: 60 },
-  { title: '姓名', key: 'name', width: 100 },
-  { title: '手机号', key: 'phone', width: 120 },
-  { title: '学校', key: 'school_name', width: 120 },
-  { title: '岗位', key: 'position_name', width: 130 },
-  { title: '上传时间', key: 'upload_time', width: 160 },
-  { title: '文件名', key: 'original', ellipsis: { tooltip: true } },
-  {
-    title: '操作', key: 'actions', width: 210,
-    render(row) {
-      return h(NSpace, { size: 6 }, {
-        default: () => [
-          h(NButton, { size: 'small', onClick: () => viewResume(row.id, row) }, { default: () => '查看' }),
-          h(NButton, { size: 'small', onClick: () => downloadOne(row.id) }, { default: () => '下载' }),
-          h(NButton, { size: 'small', type: 'error', onClick: () => deleteOne(row) }, { default: () => '删除' })
-        ]
-      })
-    }
-  }
-]
-
-const pagination = computed(() => ({
-  pageSize: PAGE_SIZE,
-  page: page.value,
-  itemCount: total.value
-}))
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
+const current = computed(() => items.value.find(i => i.id === currentId.value) || null)
 
 function fmtDate(v) {
   if (!v) return ''
   const d = new Date(v)
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${m}-${day}`
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function buildParams() {
@@ -148,8 +139,13 @@ async function loadResumes() {
     const d = await api.listResumes(buildParams())
     items.value = d.items
     total.value = d.total
-    checkedRowKeys.value = []
-    selectedIds.value = []
+    // 若当前选中的行被翻页过滤掉，清空选中
+    if (currentId.value && !items.value.find(i => i.id === currentId.value)) {
+      currentId.value = null
+    }
+    if (!currentId.value && items.value.length) {
+      currentId.value = items.value[0].id
+    }
   } catch (e) {
     message.error(e.message)
   } finally {
@@ -166,6 +162,10 @@ async function loadFilters() {
   loadResumes()
 }
 
+function selectRow(row) {
+  currentId.value = row.id
+}
+
 function doSearch() { page.value = 1; loadResumes() }
 function resetFilter() {
   filter.school = null
@@ -179,10 +179,6 @@ function resetFilter() {
 function onPageChange(p) {
   page.value = p
   loadResumes()
-}
-function onChecked(keys) {
-  checkedRowKeys.value = keys
-  selectedIds.value = keys
 }
 
 // ============ 操作 ============
@@ -209,6 +205,7 @@ function deleteOne(row) {
       try {
         await api.deleteResume(row.id)
         message.success('已删除')
+        if (currentId.value === row.id) currentId.value = null
         loadResumes()
       } catch (e) { message.error(e.message) }
     }
@@ -232,23 +229,100 @@ function deleteSelected() {
   })
 }
 
-// ============ 查看（PDF 预览） ============
-async function viewResume(id, row) {
-  previewTitle.value = row ? `${row.name || ''} · ${row.original}` : '简历预览'
-  previewShow.value = true
-  // 用 fetch 探测类型
-  try {
-    const res = await fetch(api.resumeDownloadUrl(id))
-    const ct = res.headers.get('content-type') || ''
-    previewIsPdf.value = ct.includes('application/pdf')
-  } catch (e) {
-    previewIsPdf.value = true
-  }
-  previewUrl.value = api.resumeDownloadUrl(id)
-}
-function downloadPreview() {
-  window.location.href = previewUrl.value
-}
-
 onMounted(loadFilters)
 </script>
+
+<style scoped>
+.resumes-layout {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 56px - 48px);
+  min-height: 480px;
+}
+.left-pane {
+  flex: 0 0 46%;
+  max-width: 520px;
+  min-width: 340px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.list-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.list-card :deep(.n-card__content) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 8px;
+}
+.list-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+.resume-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+  margin-bottom: 6px;
+}
+.resume-item:hover { background: #f1f5f9; }
+.resume-item.active {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+.item-main { display: flex; align-items: center; gap: 8px; }
+.item-name { font-weight: 600; color: #1e293b; font-size: 14px; }
+.item-pos {
+  font-size: 12px; color: #2563eb; background: #eff6ff;
+  padding: 2px 8px; border-radius: 10px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; max-width: 140px;
+}
+.item-sub { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+.item-sub span { font-size: 12px; color: #94a3b8; }
+.item-time { flex-shrink: 0; }
+
+.right-pane {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.preview-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+}
+.preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.preview-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+  min-height: 0;
+  background: #fff;
+}
+</style>
