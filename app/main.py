@@ -1,10 +1,12 @@
 """BR TalentHub 招聘会简历收集系统 —— FastAPI 后端。
 
-第一版 MVP：
-- 管理端大屏：设置招聘会/保存目录、展示二维码、实时统计
-- 手机端上传：姓名/手机/岗位 + 附件（PDF/DOC/DOCX）
-- 数据落 SQLite，文件落本地目录，纯局域网本地部署，无需联网/登录
+第二版：
+- 岗位管理：增删 + Excel 导入（识别"岗位名称/岗位要求"表头）
+- 学校管理：多校并存，每校独立二维码，绑定岗位
+- 简历按 学校/岗位/文件名 三级目录存储
+- 数据看板：按学校/岗位/日期多维度统计
 """
+import io
 import os
 import re
 import socket
@@ -20,6 +22,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from openpyxl import load_workbook
 
 from app import database as db
 
@@ -37,7 +40,7 @@ PORT = int(os.environ.get("PORT", "8000").strip() or "8000")
 _env_save_dir = os.environ.get("SAVE_DIR", "").strip()
 DEFAULT_DIR = Path(_env_save_dir) if _env_save_dir else Path(DATA_DIR / "resumes")
 
-app = FastAPI(title="BR TalentHub", version="1.0.0")
+app = FastAPI(title="BR TalentHub", version="2.0.0")
 
 # 应用启动时确保数据表存在
 db.init_db()
@@ -76,6 +79,17 @@ def get_local_ip() -> str:
         return ip
     except Exception:
         return "127.0.0.1"
+
+
+def build_qr(url: str) -> Response:
+    """生成二维码 PNG。"""
+    qr = qrcode.QRCode(border=2, box_size=10, error_correction=qrcode.constants.ERROR_CORRECT_M)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
 
 
 # ---------------------------------------------------------------- 配置与招聘会
@@ -131,21 +145,30 @@ def get_stats():
 
 
 @app.get("/api/qrcode")
-def qr_code():
-    """生成二维码 PNG：指向手机上传页（携带招聘会 event_id）。
+def qr_code(school: str = ""):
+    """生成二维码 PNG：指向手机上传页（携带招聘会 event_id 与学校）。
 
-    二维码指向局域网地址（http://本机IP:{PORT}/upload?event=...）。
+    二维码 URL：http://本机IP:{PORT}/upload?event={event_id}&school={校名}
+    school 为空时生成通用码（不带学校，手机端可自选学校）。
     """
     cfg = get_config()
     base = f"http://{cfg['host_ip']}:{cfg['port']}"
     url = f"{base}/upload?event={cfg['event_id']}"
-    qr = qrcode.QRCode(border=2, box_size=10, error_correction=qrcode.constants.ERROR_CORRECT_M)
-    qr.add_data(url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    return Response(content=buf.getvalue(), media_type="image/png")
+    if school:
+        url += f"&school={school}"
+    return build_qr(url)
+
+
+@app.get("/api/schools/{school_id}/qrcode")
+def school_qr_code(school_id: int):
+    """某个学校的专属二维码。"""
+    school = db.get_school(school_id)
+    if not school:
+        raise HTTPException(404, "学校不存在")
+    cfg = get_config()
+    base = f"http://{cfg['host_ip']}:{cfg['port']}"
+    url = f"{base}/upload?event={cfg['event_id']}&school={school['name']}"
+    return build_qr(url)
 
 
 @app.post("/api/event/reset")
@@ -157,6 +180,182 @@ def reset_event():
     return get_config()
 
 
+# ---------------------------------------------------------------- 岗位管理
+
+@app.get("/api/positions")
+def list_positions():
+    return db.list_positions()
+
+
+@app.post("/api/positions")
+def create_position(payload: dict):
+    name = (payload.get("name") or "").strip()
+    requirement = (payload.get("requirement") or "").strip()
+    if not name:
+        raise HTTPException(400, "岗位名称不能为空")
+    if db.position_name_exists(name):
+        raise HTTPException(400, f"岗位「{name}」已存在")
+    position_id = db.add_position(name, requirement)
+    return {"id": position_id, "name": name, "requirement": requirement}
+
+
+@app.delete("/api/positions/{position_id}")
+def delete_position(position_id: int):
+    if not db.delete_position(position_id):
+        raise HTTPException(404, "岗位不存在")
+    return {"ok": True}
+
+
+@app.post("/api/positions/import")
+async def import_positions(file: UploadFile = File(...)):
+    """Excel 导入岗位：识别"岗位名称""岗位要求"表头（支持别名），逐行创建。"""
+    if not (file.filename or "").lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(400, "仅支持 .xlsx 格式的 Excel 文件")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "文件内容为空")
+    try:
+        wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except Exception as exc:
+        raise HTTPException(400, f"无法解析 Excel 文件：{exc}")
+    ws = wb.active
+
+    rows = ws.iter_rows(values_only=True)
+    # 第一行表头
+    header = next(rows, None)
+    if not header:
+        raise HTTPException(400, "Excel 为空（无表头）")
+
+    # 识别"岗位名称""岗位要求"列（支持别名）
+    name_idx = req_idx = None
+    aliases = {
+        "岗位名称": ["岗位名称", "岗位", "职位名称", "职位", "名称", "岗位名"],
+        "岗位要求": ["岗位要求", "要求", "职位要求", "任职要求", "岗位描述", "职责"],
+    }
+    for i, cell in enumerate(header):
+        text = str(cell or "").strip()
+        if name_idx is None and text in aliases["岗位名称"]:
+            name_idx = i
+        if req_idx is None and text in aliases["岗位要求"]:
+            req_idx = i
+    if name_idx is None:
+        raise HTTPException(400, "未识别到「岗位名称」列（请确认表头含 岗位名称/岗位/职位 等）")
+
+    created, skipped, dup = 0, 0, []
+    for row in rows:
+        name = str(row[name_idx] or "").strip() if name_idx < len(row) else ""
+        if not name:
+            skipped += 1
+            continue
+        if db.position_name_exists(name):
+            dup.append(name)
+            continue
+        requirement = str(row[req_idx] or "").strip() if req_idx is not None and req_idx < len(row) else ""
+        db.add_position(name, requirement)
+        created += 1
+    return {
+        "ok": True,
+        "created": created,
+        "skipped": skipped,
+        "duplicates": dup,
+    }
+
+
+# ---------------------------------------------------------------- 学校管理
+
+def _school_out(school: dict) -> dict:
+    """学校记录 → 前端展示结构（把绑定岗位 JSON 展开为详情）。"""
+    pos_ids = json_loads(school.get("positions") or "[]")
+    positions = []
+    for pid in pos_ids:
+        p = db.get_position(pid)
+        if p:
+            positions.append({"id": p["id"], "name": p["name"]})
+    return {
+        "id": school["id"],
+        "name": school["name"],
+        "position_ids": pos_ids,
+        "positions": positions,
+        "created_at": school["created_at"],
+    }
+
+
+def json_loads(s: str) -> list:
+    import json
+
+    try:
+        return json.loads(s)
+    except Exception:
+        return []
+
+
+@app.get("/api/schools")
+def list_schools():
+    return [_school_out(s) for s in db.list_schools()]
+
+
+@app.post("/api/schools")
+def create_school(payload: dict):
+    name = (payload.get("name") or "").strip()
+    position_ids = payload.get("positions") or []
+    if not name:
+        raise HTTPException(400, "学校名称不能为空")
+    if db.school_name_exists(name):
+        raise HTTPException(400, f"学校「{name}」已存在")
+    # 校验岗位 ID 存在
+    valid = []
+    for pid in position_ids:
+        if db.get_position(pid):
+            valid.append(pid)
+    school_id = db.add_school(name, valid)
+    return _school_out(db.get_school(school_id))
+
+
+@app.put("/api/schools/{school_id}/positions")
+def update_school_positions(school_id: int, payload: dict):
+    school = db.get_school(school_id)
+    if not school:
+        raise HTTPException(404, "学校不存在")
+    position_ids = payload.get("positions") or []
+    valid = [pid for pid in position_ids if db.get_position(pid)]
+    db.update_school_positions(school_id, valid)
+    return _school_out(db.get_school(school_id))
+
+
+@app.delete("/api/schools/{school_id}")
+def delete_school(school_id: int):
+    if not db.delete_school(school_id):
+        raise HTTPException(404, "学校不存在")
+    return {"ok": True}
+
+
+@app.get("/api/options")
+def get_options(school: str = ""):
+    """手机端下拉数据源：学校列表 + 指定学校的岗位列表。"""
+    schools = [_school_out(s) for s in db.list_schools()]
+    positions = []
+    if school:
+        s = db.get_school_by_name(school)
+        if s:
+            positions = _school_out(s)["positions"]
+    return {
+        "schools": [{"id": s["id"], "name": s["name"]} for s in schools],
+        "positions": positions,
+        "school": school,
+    }
+
+
+# ---------------------------------------------------------------- 数据看板
+
+@app.get("/api/dashboard")
+def get_dashboard():
+    """看板统计：总数 / 按学校 / 按岗位 / 近7日。"""
+    stats = db.dashboard_stats()
+    # 补充学校/岗位名称（供看板横向图用）
+    return stats
+
+
 # ---------------------------------------------------------------- 简历上传
 
 @app.post("/api/resumes/upload")
@@ -165,13 +364,44 @@ async def upload_resume(
     name: str = Form(""),
     phone: str = Form(""),
     position: str = Form(""),
+    school: str = Form(""),
+    position_id: int = Form(0),
 ):
-    """手机端提交简历：校验 → 落盘 → 记录到 SQLite。"""
+    """手机端提交简历：校验（岗位必填）→ 按 学校/岗位/文件 三级目录落盘 → 记录。"""
     name = (name or "").strip()
     phone = (phone or "").strip()
     position = (position or "").strip()
-    if not name:
-        raise HTTPException(400, "请填写姓名")
+    school = (school or "").strip()
+
+    # 岗位必填
+    if not position:
+        raise HTTPException(400, "请选择应聘岗位")
+
+    # 解析学校（二维码带 school 参数则锁定，否则取第一个学校）
+    school_row = db.get_school_by_name(school) if school else None
+    if not school_row:
+        schools = db.list_schools()
+        if not schools:
+            raise HTTPException(400, "暂未配置招聘学校，请联系现场工作人员")
+        school_row = schools[0]
+        school = school_row["name"]
+    school_id = school_row["id"]
+
+    # 岗位：优先用 position_id（来自下拉框），否则按名称匹配
+    position_row = db.get_position(position_id) if position_id else None
+    if not position_row:
+        for p in db.list_positions():
+            if p["name"] == position:
+                position_row = p
+                break
+    if not position_row:
+        raise HTTPException(400, f"岗位「{position}」不存在")
+    position_id = position_row["id"]
+
+    # 学校-岗位归属校验：岗位必须属于该学校绑定列表（手机端下拉只显示该校岗位）
+    school_pos_ids = json_loads(school_row.get("positions") or "[]")
+    if position_id not in school_pos_ids:
+        raise HTTPException(400, f"岗位「{position_row['name']}」不属于学校「{school_row['name']}」")
 
     original = file.filename or "resume"
     ext = Path(original).suffix.lower()
@@ -185,12 +415,19 @@ async def upload_resume(
     # 清理文件名里的不安全字符
     safe_original = re.sub(r'[\\/:*?"<>|\r\n]', "_", original)
 
-    save_dir = Path(db.get_setting("save_dir", str(DEFAULT_DIR)))
-    save_dir.mkdir(parents=True, exist_ok=True)
+    # 三级目录：保存目录 / 学校名 / 岗位名 / 文件
+    base_dir = Path(db.get_setting("save_dir", str(DEFAULT_DIR)))
+    safe_school = re.sub(r'[\\/:*?"<>|\r\n]', "_", school)
+    safe_position = re.sub(r'[\\/:*?"<>|\r\n]', "_", position)
+    target_dir = base_dir / safe_school / safe_position
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        raise HTTPException(400, f"无法创建存储目录：{exc}")
 
     ts = datetime.now().strftime("%Y%m%d%H%M%S")
     stored_name = f"{ts}_{uuid.uuid4().hex[:6]}{ext}"
-    filepath = save_dir / stored_name
+    filepath = target_dir / stored_name
     filepath.write_bytes(content)
 
     record = {
@@ -203,6 +440,8 @@ async def upload_resume(
         "filesize": len(content),
         "upload_time": now_str(),
         "ip": "",
+        "school_id": school_id,
+        "position_id": position_id,
     }
     resume_id = db.add_resume(record)
     return {"id": resume_id, "message": "上传成功", "filename": original}

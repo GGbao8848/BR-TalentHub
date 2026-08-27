@@ -14,7 +14,7 @@
     background: linear-gradient(135deg, #0f2027, #2c5364);
     color: #fff; padding: 28px 20px; text-align: center;
   }
-  .hero h1 { font-size: 22px; margin-bottom: 6px; }
+  .hero h1 { font-size: 20px; margin-bottom: 6px; }
   .hero p { font-size: 14px; color: #b3cde0; }
   .form {
     padding: 24px 20px; max-width: 480px; margin: 0 auto;
@@ -25,6 +25,24 @@
     font-size: 16px; background: #fff; outline: none; transition: border .15s;
   }
   input:focus { border-color: #2c5364; }
+
+  /* 岗位下拉（可搜索）：用 input + 候选列表模拟 */
+  .pos-select { position: relative; }
+  .pos-input { cursor: pointer; }
+  .pos-list {
+    display: none; position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+    background: #fff; border: 1px solid #d8dee5; border-radius: 10px; max-height: 240px;
+    overflow-y: auto; box-shadow: 0 6px 20px rgba(0,0,0,0.12); z-index: 20;
+  }
+  .pos-list.show { display: block; }
+  .pos-search { width: 100%; border: none; border-bottom: 1px solid #eee; padding: 12px 14px; font-size: 15px; outline: none; }
+  .pos-option {
+    padding: 13px 14px; font-size: 15px; cursor: pointer; border-bottom: 1px solid #f4f6f9;
+  }
+  .pos-option:active, .pos-option.selected { background: #eef4f8; color: #2c5364; }
+  .pos-option .req { font-size: 12px; color: #8b9aab; display: block; margin-top: 2px; }
+  .pos-empty { padding: 16px; text-align: center; color: #8b9aab; font-size: 14px; }
+  .pos-selected { margin-top: 8px; padding: 10px 14px; background: #e8f5e9; border-radius: 8px; font-size: 14px; color: #2e7d32; display: none; }
 
   .upload-zone {
     border: 2px dashed #b0bfcc; border-radius: 12px; padding: 26px 16px;
@@ -58,23 +76,34 @@
     background: #2c5364; color: #fff; font-size: 15px; cursor: pointer;
   }
   .err-msg { display: none; color: #d32f2f; font-size: 13px; margin-top: 10px; }
+  .school-tag {
+    display: inline-block; margin-top: 10px; padding: 6px 14px; background: rgba(255,255,255,0.12);
+    border-radius: 20px; font-size: 13px; color: #b3cde0;
+  }
 </style>
 </head>
 <body>
   <div class="hero">
     <h1 id="eventTitle">招聘会</h1>
-    <p>请填写信息并上传简历</p>
+    <p id="eventSub">请填写信息并上传简历</p>
   </div>
 
   <div class="form" id="formBox">
-    <label>姓名 <span style="color:#d32f2f">*</span></label>
-    <input type="text" id="name" placeholder="请输入姓名" maxlength="30">
+    <label>姓名</label>
+    <input type="text" id="name" placeholder="选填" maxlength="30">
 
     <label>手机号</label>
     <input type="tel" id="phone" placeholder="选填" maxlength="20">
 
-    <label>应聘岗位</label>
-    <input type="text" id="position" placeholder="选填" maxlength="50">
+    <label>应聘岗位 <span style="color:#d32f2f">*</span></label>
+    <div class="pos-select">
+      <input type="text" id="position" class="pos-input" placeholder="请选择或搜索岗位" readonly>
+      <div class="pos-list" id="posList">
+        <input type="text" class="pos-search" id="posSearch" placeholder="输入搜索岗位…">
+        <div id="posOptions"></div>
+      </div>
+    </div>
+    <div class="pos-selected" id="posSelected"></div>
 
     <label>简历附件 <span style="color:#d32f2f">*</span></label>
     <div class="upload-zone" id="uploadZone">
@@ -93,24 +122,110 @@
   <div class="success-box" id="successBox">
     <div class="tick">✅</div>
     <h2>上传成功！</h2>
-    <p>你的简历已提交，感谢参加本次招聘会。</p>
+    <p id="successMsg">你的简历已提交，感谢参加本次招聘会。</p>
     <button class="again-btn" onclick="resetForm()">再传一份</button>
   </div>
 
 <script>
 let selectedFile = null;
+let selectedPosition = null;   // {id, name}
+let positions = [];            // 当前学校岗位列表
+let schoolName = '';           // 二维码携带的学校
 
-// 读取招聘会名称
+// 从 URL 取 school 参数
+const params = new URLSearchParams(location.search);
+schoolName = params.get('school') || '';
+
+// 读取招聘会名称 + 学校岗位
 (async function loadEvent() {
   try {
     const r = await fetch('/api/config');
     const d = await r.json();
-    document.getElementById('eventTitle').textContent = d.event_name;
+    // 标题：有学校则 "XX学校 BR 招聘会"，否则 "BR 招聘会"
+    document.getElementById('eventTitle').textContent = schoolName
+      ? `${schoolName} BR 招聘会`
+      : d.event_name || 'BR 招聘会';
+    document.getElementById('eventSub').textContent = schoolName
+      ? '请填写信息并上传简历'
+      : '请填写信息并上传简历';
+    if (schoolName) {
+      const sub = document.querySelector('.school-tag');
+      // 加载该学校岗位
+      const opt = await fetch('/api/options?school=' + encodeURIComponent(schoolName));
+      const od = await opt.json();
+      positions = od.positions || [];
+      if (!positions.length) {
+        document.getElementById('errMsg').textContent = '该学校暂未配置招聘岗位，请联系现场工作人员';
+        document.getElementById('errMsg').style.display = 'block';
+      }
+    } else {
+      // 无学校参数：加载默认岗位（第一个学校的）
+      const opt = await fetch('/api/options');
+      const od = await opt.json();
+      if (od.positions && od.positions.length) positions = od.positions;
+    }
+    renderPositionList(positions);
   } catch (e) {
     document.getElementById('eventTitle').textContent = '招聘会';
   }
 })();
 
+// ============ 岗位下拉（可搜索） ============
+const posInput = document.getElementById('position');
+const posList = document.getElementById('posList');
+const posSearch = document.getElementById('posSearch');
+const posOptions = document.getElementById('posOptions');
+
+function renderPositionList(list) {
+  if (!list.length) {
+    posOptions.innerHTML = '<div class="pos-empty">暂无可用岗位</div>';
+    return;
+  }
+  posOptions.innerHTML = list.map(p =>
+    `<div class="pos-option" data-id="${p.id}" data-name="${escapeHtml(p.name)}">
+      ${escapeHtml(p.name)}
+      ${p.requirement ? `<span class="req">${escapeHtml(p.requirement)}</span>` : ''}
+    </div>`).join('');
+  posOptions.querySelectorAll('.pos-option').forEach(el => {
+    el.addEventListener('click', () => selectPosition(el.dataset.id, el.dataset.name));
+  });
+}
+
+function selectPosition(id, name) {
+  selectedPosition = { id: Number(id), name };
+  posInput.value = name;
+  const sel = document.getElementById('posSelected');
+  sel.textContent = '已选岗位：' + name;
+  sel.style.display = 'block';
+  posList.classList.remove('show');
+  document.getElementById('errMsg').style.display = 'none';
+}
+
+posInput.addEventListener('click', () => {
+  posList.classList.toggle('show');
+  posSearch.value = '';
+  filterPositions('');
+  if (posList.classList.contains('show')) setTimeout(() => posSearch.focus(), 50);
+});
+posSearch.addEventListener('input', () => filterPositions(posSearch.value.trim()));
+document.addEventListener('click', e => {
+  if (!posInput.contains(e.target) && !posList.contains(e.target)) posList.classList.remove('show');
+});
+
+function filterPositions(kw) {
+  const list = kw
+    ? positions.filter(p => p.name.toLowerCase().includes(kw.toLowerCase()))
+    : positions;
+  renderPositionList(list);
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+// ============ 文件选择 ============
 const zone = document.getElementById('uploadZone');
 const input = document.getElementById('fileInput');
 
@@ -142,11 +257,11 @@ input.addEventListener('change', e => {
   info.style.display = 'block';
 });
 
+// ============ 提交 ============
 async function doSubmit() {
   const err = document.getElementById('errMsg');
   err.style.display = 'none';
-  const name = document.getElementById('name').value.trim();
-  if (!name) { err.textContent = '请填写姓名'; err.style.display = 'block'; return; }
+  if (!selectedPosition) { err.textContent = '请选择应聘岗位'; err.style.display = 'block'; return; }
   if (!selectedFile) { err.textContent = '请选择简历附件'; err.style.display = 'block'; return; }
 
   const btn = document.getElementById('submitBtn');
@@ -155,9 +270,11 @@ async function doSubmit() {
   btn.classList.add('loading');
 
   const fd = new FormData();
-  fd.append('name', name);
+  fd.append('name', document.getElementById('name').value.trim());
   fd.append('phone', document.getElementById('phone').value.trim());
-  fd.append('position', document.getElementById('position').value.trim());
+  fd.append('position', selectedPosition.name);
+  fd.append('position_id', selectedPosition.id);
+  fd.append('school', schoolName);
   fd.append('file', selectedFile);
 
   try {
@@ -166,6 +283,7 @@ async function doSubmit() {
     if (!r.ok) throw new Error(d.detail || '上传失败');
     document.getElementById('formBox').style.display = 'none';
     document.getElementById('successBox').style.display = 'block';
+    document.getElementById('successMsg').textContent = `岗位「${selectedPosition.name}」的简历已提交，感谢参加本次招聘会。`;
   } catch (e) {
     err.textContent = e.message;
     err.style.display = 'block';
@@ -181,7 +299,9 @@ function resetForm() {
   document.getElementById('formBox').style.display = 'block';
   document.getElementById('name').value = '';
   document.getElementById('phone').value = '';
+  selectedPosition = null;
   document.getElementById('position').value = '';
+  document.getElementById('posSelected').style.display = 'none';
   document.getElementById('fileInfo').style.display = 'none';
   document.getElementById('fileInfo').textContent = '';
   input.value = '';
