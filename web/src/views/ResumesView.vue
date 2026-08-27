@@ -43,16 +43,9 @@
         :row-key="rowKey"
         :checked-row-keys="checkedRowKeys"
         @update:checked-row-keys="onChecked"
+        @update:page="onPageChange"
         :loading="loading"
       />
-
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
-        <span style="color:#94a3b8;font-size:13px">共 {{ total }} 条 · 第 {{ page }}/{{ totalPages }} 页</span>
-        <n-space>
-          <n-button size="small" :disabled="page <= 1" @click="changePage(-1)">上一页</n-button>
-          <n-button size="small" :disabled="page >= totalPages" @click="changePage(1)">下一页</n-button>
-        </n-space>
-      </div>
     </n-card>
 
     <!-- 预览弹窗 -->
@@ -98,8 +91,6 @@ const previewUrl = ref('')
 const previewIsPdf = ref(false)
 const previewTitle = ref('')
 
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
-
 function rowKey(row) { return row.id }
 
 const columns = [
@@ -112,7 +103,7 @@ const columns = [
   { title: '上传时间', key: 'upload_time', width: 160 },
   { title: '文件名', key: 'original', ellipsis: { tooltip: true } },
   {
-    title: '操作', key: 'actions', width: 180,
+    title: '操作', key: 'actions', width: 210,
     render(row) {
       return h(NSpace, { size: 6 }, {
         default: () => [
@@ -185,8 +176,8 @@ function resetFilter() {
   page.value = 1
   loadResumes()
 }
-function changePage(dir) {
-  page.value += dir
+function onPageChange(p) {
+  page.value = p
   loadResumes()
 }
 function onChecked(keys) {

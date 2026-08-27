@@ -9,8 +9,8 @@
         <n-form-item label="简历保存目录" style="min-width:260px">
           <n-input v-model:value="saveDir" placeholder="如：D:\招聘会\2026" />
         </n-form-item>
-        <n-button type="primary" @click="saveConfig">保存</n-button>
-        <n-button type="warning" @click="resetEvent">开始新一场</n-button>
+        <n-button type="primary" size="large" @click="saveConfig">保存</n-button>
+        <n-button type="error" size="large" ghost @click="resetEvent">开始新一场</n-button>
       </n-space>
       <div style="color:#94a3b8;font-size:12px;margin-top:8px">当前保存目录：{{ saveDir }}</div>
     </n-card>
