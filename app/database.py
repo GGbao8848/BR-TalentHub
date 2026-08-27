@@ -128,6 +128,18 @@ def delete_position(position_id: int) -> bool:
     return deleted
 
 
+def update_position(position_id: int, name: str, requirement: str) -> bool:
+    conn = get_conn()
+    cur = conn.execute(
+        "UPDATE positions SET name=?, requirement=? WHERE id=?",
+        (name.strip(), (requirement or "").strip(), position_id),
+    )
+    conn.commit()
+    updated = cur.rowcount > 0
+    conn.close()
+    return updated
+
+
 def position_name_exists(name: str, exclude_id: int | None = None) -> bool:
     conn = get_conn()
     if exclude_id:

@@ -102,6 +102,7 @@ def get_config():
     if not db.get_setting("event_id"):
         db.set_setting("event_id", event_id)
     save_dir = db.get_setting("save_dir", str(DEFAULT_DIR))
+    active_school = db.get_setting("active_school", "")
     return {
         "event_name": event_name,
         "event_id": event_id,
@@ -109,6 +110,7 @@ def get_config():
         "host_ip": get_local_ip(),
         "port": PORT,
         "count": db.count_resumes(),
+        "active_school": active_school,
         "updated_at": db.get_setting("updated_at", ""),
     }
 
@@ -204,6 +206,21 @@ def delete_position(position_id: int):
     if not db.delete_position(position_id):
         raise HTTPException(404, "岗位不存在")
     return {"ok": True}
+
+
+@app.put("/api/positions/{position_id}")
+def update_position(position_id: int, payload: dict):
+    """编辑岗位：改名称 / 岗位要求。"""
+    name = (payload.get("name") or "").strip()
+    requirement = (payload.get("requirement") or "").strip()
+    if not name:
+        raise HTTPException(400, "岗位名称不能为空")
+    if db.position_name_exists(name, exclude_id=position_id):
+        raise HTTPException(400, f"岗位「{name}」已存在")
+    if not db.update_position(position_id, name, requirement):
+        raise HTTPException(404, "岗位不存在")
+    p = db.get_position(position_id)
+    return {"id": p["id"], "name": p["name"], "requirement": p["requirement"]}
 
 
 @app.post("/api/positions/import")
@@ -328,6 +345,17 @@ def delete_school(school_id: int):
     if not db.delete_school(school_id):
         raise HTTPException(404, "学校不存在")
     return {"ok": True}
+
+
+@app.post("/api/schools/{school_id}/activate")
+def activate_school(school_id: int):
+    """将某学校设为当前招聘会学校（现场大屏切换用）。"""
+    school = db.get_school(school_id)
+    if not school:
+        raise HTTPException(404, "学校不存在")
+    db.set_setting("active_school", school["name"])
+    db.set_setting("updated_at", now_str())
+    return {"ok": True, "school": school["name"]}
 
 
 @app.get("/api/options")

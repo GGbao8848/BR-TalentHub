@@ -154,6 +154,9 @@
       <h2>现场扫码上传</h2>
       <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start">
         <div style="text-align:center">
+          <div class="muted" style="margin-bottom:6px">当前招聘学校</div>
+          <div class="event-name" id="activeSchoolName" style="font-size:18px; margin-bottom:10px">—</div>
+          <select id="activeSchoolSelect" onchange="switchActiveSchool()" style="width:220px;margin-bottom:10px"></select>
           <img id="qrImg" src="/api/qrcode?t=1" alt="二维码" style="width:220px;height:220px;background:#fff;padding:10px;border-radius:10px">
           <div class="muted" id="qrUrl" style="margin-top:8px;max-width:280px;word-break:break-all"></div>
         </div>
@@ -195,7 +198,7 @@
     <div class="card">
       <h2>岗位列表（<span id="posCount">0</span>）</h2>
       <table>
-        <thead><tr><th style="width:60px">ID</th><th style="width:200px">岗位名称</th><th>岗位要求</th><th style="width:80px">操作</th></tr></thead>
+        <thead><tr><th style="width:60px">ID</th><th style="width:200px">岗位名称</th><th>岗位要求</th><th style="width:150px">操作</th></tr></thead>
         <tbody id="posTbody"></tbody>
       </table>
       <div class="empty" id="posEmpty">暂无岗位，请先添加或导入</div>
@@ -282,13 +285,65 @@ async function loadConfig() {
     document.getElementById('saveDir').value = config.save_dir;
     document.getElementById('saveDirHint').textContent = '当前保存目录：' + config.save_dir;
     document.getElementById('headerEvent').textContent = config.event_name;
-    document.getElementById('qrUrl').textContent = getAccessUrl(config);
-    document.getElementById('statCount').textContent = config.count;
+    updateActiveSchoolUI();
+    renderActiveSchoolSelect();
+    refreshQr();
   } catch (e) { toast('无法连接后端服务', true); }
 }
 
 function getAccessUrl(cfg) {
-  return `手机访问：http://${cfg.host_ip}:${cfg.port}/upload?event=${cfg.event_id}`;
+  const school = cfg.active_school ? `&school=${encodeURIComponent(cfg.active_school)}` : '';
+  return `手机访问：http://${cfg.host_ip}:${cfg.port}/upload?event=${cfg.event_id}${school}`;
+}
+
+async function renderActiveSchoolSelect() {
+  const sel = document.getElementById('activeSchoolSelect');
+  sel.innerHTML = '<option value="">未指定学校</option>';
+  try {
+    const r = await fetch('/api/schools');
+    const schools = await r.json();
+    schools.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.name;
+      opt.textContent = s.name;
+      if (config && config.active_school === s.name) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch (e) {}
+}
+
+function updateActiveSchoolUI() {
+  const name = config.active_school || '未指定学校';
+  document.getElementById('activeSchoolName').textContent = name;
+  const url = getAccessUrl(config);
+  document.getElementById('qrUrl').textContent = url;
+}
+
+function refreshQr() {
+  const qr = document.getElementById('qrImg');
+  if (config && config.active_school) {
+    qr.src = `/api/qrcode?school=${encodeURIComponent(config.active_school)}&t=${Date.now()}`;
+  } else {
+    qr.src = '/api/qrcode?t=' + Date.now();
+  }
+}
+
+async function switchActiveSchool() {
+  const sel = document.getElementById('activeSchoolSelect');
+  const name = sel.value;
+  if (!name) { toast('请选择学校', true); return; }
+  // 从学校列表找到 id
+  const r = await fetch('/api/schools');
+  const schools = await r.json();
+  const school = schools.find(s => s.name === name);
+  if (!school) { toast('学校不存在', true); return; }
+  const res = await fetch(`/api/schools/${school.id}/activate`, { method: 'POST' });
+  const d = await res.json();
+  if (!res.ok) { toast(d.detail || '切换失败', true); return; }
+  config.active_school = d.school;
+  updateActiveSchoolUI();
+  refreshQr();
+  toast(`已切换为「${d.school}」招聘会 ✅`);
 }
 
 async function saveConfig() {
@@ -299,7 +354,7 @@ async function saveConfig() {
   const r = await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   if (!r.ok) { const err = await r.json().catch(() => ({})); toast(err.detail || '保存失败', true); return; }
   config = await r.json();
-  document.getElementById('qrImg').src = '/api/qrcode?t=' + Date.now();
+  refreshQr();
   loadConfig();
   toast('已保存 ✅');
 }
@@ -308,7 +363,7 @@ async function resetEvent() {
   if (!confirm('确定开始新一场招聘会？将生成新二维码，已收简历不删除。')) return;
   const r = await fetch('/api/event/reset', { method: 'POST' });
   config = await r.json();
-  document.getElementById('qrImg').src = '/api/qrcode?t=' + Date.now();
+  refreshQr();
   loadConfig();
   toast('已开始新一场');
 }
@@ -343,7 +398,10 @@ async function loadPositions() {
     document.getElementById('posEmpty').style.display = positions.length ? 'none' : 'block';
     tb.innerHTML = positions.map(p => `<tr>
       <td>${p.id}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.requirement || '—')}</td>
-      <td><button class="btn btn-danger btn-sm" onclick="deletePosition(${p.id})">删除</button></td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="editPosition(${p.id})">编辑</button>
+        <button class="btn btn-danger btn-sm" onclick="deletePosition(${p.id})">删除</button>
+      </td>
     </tr>`).join('');
   } catch (e) { toast('加载岗位失败', true); }
 }
@@ -368,6 +426,43 @@ async function deletePosition(id) {
   if (!r.ok) { toast('删除失败', true); return; }
   loadPositions(); loadSchools();
   toast('已删除');
+}
+
+function editPosition(id) {
+  const p = positions.find(x => x.id === id);
+  if (!p) return;
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#1c2f3a;padding:24px;border-radius:12px;min-width:340px;max-width:480px;width:90%';
+  box.innerHTML = `
+    <h2 style="font-size:16px;color:#ffe082;margin-bottom:16px">编辑岗位</h2>
+    <label>岗位名称</label>
+    <input type="text" id="editPosName" value="${escapeHtml(p.name)}">
+    <label>岗位要求</label>
+    <input type="text" id="editPosReq" value="${escapeHtml(p.requirement || '')}" placeholder="选填">
+    <div style="text-align:right;margin-top:18px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="this.closest('div').remove();modal.remove()">取消</button>
+      <button class="btn btn-primary" id="editPosSave">保存</button>
+    </div>`;
+  modal.appendChild(box);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  document.body.appendChild(modal);
+  document.getElementById('editPosSave').onclick = async () => {
+    const name = document.getElementById('editPosName').value.trim();
+    const requirement = document.getElementById('editPosReq').value.trim();
+    if (!name) { toast('请填写岗位名称', true); return; }
+    const r = await fetch('/api/positions/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, requirement }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(d.detail || '保存失败', true); return; }
+    modal.remove();
+    loadPositions(); loadSchools();
+    toast('岗位已更新 ✅');
+  };
 }
 
 function importPositions() {
