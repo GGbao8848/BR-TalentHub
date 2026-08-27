@@ -485,18 +485,20 @@ def list_resumes(
     school: str = "",
     position: str = "",
     keyword: str = "",
-    date: str = "",
+    date_start: str = "",
+    date_end: str = "",
     limit: int = 100,
     offset: int = 0,
 ):
-    """简历管理：按 学校/岗位/关键词/日期 筛选，分页。"""
+    """简历管理：按 学校/岗位/关键词/日期时间段 筛选，分页。"""
     limit = min(max(limit, 1), 500)
     offset = max(offset, 0)
     return db.query_resumes(
         school=school,
         position=position,
         keyword=keyword,
-        date=date,
+        date_start=date_start,
+        date_end=date_end,
         limit=limit,
         offset=offset,
     )
@@ -521,7 +523,8 @@ def export_resumes(
     school: str = "",
     position: str = "",
     keyword: str = "",
-    date: str = "",
+    date_start: str = "",
+    date_end: str = "",
     ids: str = "",
 ):
     """按当前筛选条件（或指定 ids）打包下载简历文件（ZIP）。
@@ -541,7 +544,8 @@ def export_resumes(
             school=school,
             position=position,
             keyword=keyword,
-            date=date,
+            date_start=date_start,
+            date_end=date_end,
             limit=500,
             offset=0,
         )

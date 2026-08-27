@@ -200,7 +200,8 @@
       <div class="row" style="align-items:flex-end">
         <div class="grow" style="flex:1 1 160px"><label>学校</label><select id="resumeSchoolFilter"><option value="">全部学校</option></select></div>
         <div class="grow" style="flex:1 1 160px"><label>岗位</label><select id="resumePosFilter"><option value="">全部岗位</option></select></div>
-        <div class="grow" style="flex:1 1 160px"><label>日期</label><input type="date" id="resumeDateFilter"></div>
+        <div class="grow" style="flex:1 1 160px"><label>开始日期</label><input type="date" id="resumeDateStart"></div>
+        <div class="grow" style="flex:1 1 160px"><label>结束日期</label><input type="date" id="resumeDateEnd"></div>
         <div class="grow" style="flex:1 1 180px"><label>关键词</label><input type="search" id="resumeKeyword" placeholder="姓名 / 手机 / 文件名"></div>
         <button class="btn btn-primary" onclick="applyResumeFilter()">查询</button>
         <button class="btn btn-ghost" onclick="resetResumeFilter()">重置</button>
@@ -708,11 +709,13 @@ function resumeFilterParams() {
   const p = new URLSearchParams();
   const s = document.getElementById('resumeSchoolFilter').value;
   const pos = document.getElementById('resumePosFilter').value;
-  const d = document.getElementById('resumeDateFilter').value;
+  const d1 = document.getElementById('resumeDateStart').value;
+  const d2 = document.getElementById('resumeDateEnd').value;
   const kw = document.getElementById('resumeKeyword').value.trim();
   if (s) p.set('school', s);
   if (pos) p.set('position', pos);
-  if (d) p.set('date', d);
+  if (d1) p.set('date_start', d1);
+  if (d2) p.set('date_end', d2);
   if (kw) p.set('keyword', kw);
   p.set('limit', RESUME_PAGE_SIZE);
   p.set('offset', (resumePageNo - 1) * RESUME_PAGE_SIZE);
@@ -752,7 +755,8 @@ function applyResumeFilter() { resumePageNo = 1; loadResumes(); }
 function resetResumeFilter() {
   document.getElementById('resumeSchoolFilter').value = '';
   document.getElementById('resumePosFilter').value = '';
-  document.getElementById('resumeDateFilter').value = '';
+  document.getElementById('resumeDateStart').value = '';
+  document.getElementById('resumeDateEnd').value = '';
   document.getElementById('resumeKeyword').value = '';
   resumePageNo = 1;
   loadResumes();

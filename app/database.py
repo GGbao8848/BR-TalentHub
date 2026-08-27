@@ -255,11 +255,12 @@ def query_resumes(
     school: str = "",
     position: str = "",
     keyword: str = "",
-    date: str = "",
+    date_start: str = "",
+    date_end: str = "",
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict]:
-    """简历列表：按 学校/岗位/关键词/日期 筛选，分页返回（含总数）。"""
+    """简历列表：按 学校/岗位/关键词/日期时间段 筛选，分页返回（含总数）。"""
     where, params = [], []
     if school:
         where.append("s.name = ?")
@@ -271,9 +272,16 @@ def query_resumes(
         like = f"%{keyword}%"
         where.append("(r.name LIKE ? OR r.phone LIKE ? OR r.original LIKE ?)")
         params += [like, like, like]
-    if date:
-        where.append("substr(r.upload_time, 1, 10) = ?")
-        params.append(date)
+    # 日期时间段：可只填开始、只填结束，或两者都填（含当天）
+    if date_start and date_end:
+        where.append("substr(r.upload_time, 1, 10) BETWEEN ? AND ?")
+        params += [date_start, date_end]
+    elif date_start:
+        where.append("substr(r.upload_time, 1, 10) >= ?")
+        params.append(date_start)
+    elif date_end:
+        where.append("substr(r.upload_time, 1, 10) <= ?")
+        params.append(date_end)
     clause = (" WHERE " + " AND ".join(where)) if where else ""
 
     conn = get_conn()
