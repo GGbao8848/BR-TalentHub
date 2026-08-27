@@ -11,6 +11,7 @@ import os
 import re
 import socket
 import uuid
+import zipfile
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -395,13 +396,17 @@ async def upload_resume(
     school: str = Form(""),
     position_id: int = Form(0),
 ):
-    """手机端提交简历：校验（岗位必填）→ 按 学校/岗位/文件 三级目录落盘 → 记录。"""
+    """手机端提交简历：校验（姓名/手机/岗位必填）→ 按 学校/岗位/文件 三级目录落盘 → 记录。"""
     name = (name or "").strip()
     phone = (phone or "").strip()
     position = (position or "").strip()
     school = (school or "").strip()
 
-    # 岗位必填
+    # 姓名 / 手机 / 岗位必填（与手机端前端校验一致）
+    if not name:
+        raise HTTPException(400, "请填写姓名")
+    if not phone:
+        raise HTTPException(400, "请填写手机号")
     if not position:
         raise HTTPException(400, "请选择应聘岗位")
 
@@ -476,8 +481,99 @@ async def upload_resume(
 
 
 @app.get("/api/resumes")
-def list_resumes(limit: int = 50):
-    return db.list_resumes(limit=limit)
+def list_resumes(
+    school: str = "",
+    position: str = "",
+    keyword: str = "",
+    date: str = "",
+    limit: int = 100,
+    offset: int = 0,
+):
+    """简历管理：按 学校/岗位/关键词/日期 筛选，分页。"""
+    limit = min(max(limit, 1), 500)
+    offset = max(offset, 0)
+    return db.query_resumes(
+        school=school,
+        position=position,
+        keyword=keyword,
+        date=date,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.delete("/api/resumes/{resume_id}")
+def delete_resume(resume_id: int):
+    """删除单条简历记录（同时删除磁盘文件）。"""
+    row = db.get_resume(resume_id)
+    if not row:
+        raise HTTPException(404, "记录不存在")
+    try:
+        Path(row["filepath"]).unlink(missing_ok=True)
+    except Exception:
+        pass
+    db.delete_resume(resume_id)
+    return {"ok": True}
+
+
+@app.get("/api/resumes/export.zip")
+def export_resumes(
+    school: str = "",
+    position: str = "",
+    keyword: str = "",
+    date: str = "",
+    ids: str = "",
+):
+    """按当前筛选条件（或指定 ids）打包下载简历文件（ZIP）。
+
+    文件名保留 学校/岗位 目录结构，便于会后归档。
+    """
+    if ids:
+        # 指定记录：按 id 导出
+        id_list = [int(x) for x in ids.split(",") if x.strip().isdigit()]
+        items = []
+        for rid in id_list:
+            row = db.get_resume(rid)
+            if row:
+                items.append(row)
+    else:
+        data = db.query_resumes(
+            school=school,
+            position=position,
+            keyword=keyword,
+            date=date,
+            limit=500,
+            offset=0,
+        )
+        items = data["items"]
+    if not items:
+        raise HTTPException(400, "没有符合条件的简历")
+
+    buf = BytesIO()
+    # 处理 zip 内文件名重复（同名原始文件名 + 落盘时间戳）
+    seen = {}
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for r in items:
+            path = Path(r["filepath"])
+            if not path.exists():
+                continue
+            base = Path(r["original"]).stem
+            ext = Path(r["original"]).suffix
+            folder = f"{r.get('school_name') or '未分类'}/{r.get('position_name') or '未分类'}"
+            name = base + ext
+            if name in seen:
+                seen[name] += 1
+                name = f"{base}_{seen[name]}{ext}"
+            else:
+                seen[name] = 0
+            zf.write(path, arcname=f"{folder}/{name}")
+    buf.seek(0)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="resumes_{stamp}.zip"'},
+    )
 
 
 @app.get("/api/resumes/{resume_id}/download")

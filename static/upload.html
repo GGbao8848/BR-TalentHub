@@ -80,6 +80,10 @@
     display: inline-block; margin-top: 10px; padding: 6px 14px; background: rgba(255,255,255,0.12);
     border-radius: 20px; font-size: 13px; color: #b3cde0;
   }
+  .input-err { border-color: #d32f2f !important; }
+  .hint-err { display: none; color: #d32f2f; font-size: 12px; margin-top: 6px; }
+  .success-box .tick-anim { font-size: 64px; color: #4caf50; display: inline-block; animation: tickPop .5s ease; }
+  @keyframes tickPop { 0% { transform: scale(0); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
 </style>
 </head>
 <body>
@@ -89,11 +93,13 @@
   </div>
 
   <div class="form" id="formBox">
-    <label>姓名</label>
-    <input type="text" id="name" placeholder="选填" maxlength="30">
+    <label>姓名 <span style="color:#d32f2f">*</span></label>
+    <input type="text" id="name" placeholder="请填写姓名" maxlength="30">
+    <div class="hint-err" id="nameErr">请填写姓名</div>
 
-    <label>手机号</label>
-    <input type="tel" id="phone" placeholder="选填" maxlength="20">
+    <label>手机号 <span style="color:#d32f2f">*</span></label>
+    <input type="tel" id="phone" placeholder="请填写手机号" maxlength="20">
+    <div class="hint-err" id="phoneErr">请填写手机号</div>
 
     <label>应聘岗位 <span style="color:#d32f2f">*</span></label>
     <div class="pos-select">
@@ -120,7 +126,7 @@
   </div>
 
   <div class="success-box" id="successBox">
-    <div class="tick">✅</div>
+    <div class="tick-anim">✅</div>
     <h2>上传成功！</h2>
     <p id="successMsg">你的简历已提交，感谢参加本次招聘会。</p>
     <button class="again-btn" onclick="resetForm()">再传一份</button>
@@ -258,9 +264,20 @@ input.addEventListener('change', e => {
 });
 
 // ============ 提交 ============
+function showFieldErr(id, errId, show) {
+  document.getElementById(errId).style.display = show ? 'block' : 'none';
+  document.getElementById(id).classList.toggle('input-err', show);
+}
+
 async function doSubmit() {
   const err = document.getElementById('errMsg');
   err.style.display = 'none';
+
+  const name = document.getElementById('name').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  showFieldErr('name', 'nameErr', !name);
+  showFieldErr('phone', 'phoneErr', !phone);
+  if (!name || !phone) { err.textContent = '请填写姓名和手机号'; err.style.display = 'block'; return; }
   if (!selectedPosition) { err.textContent = '请选择应聘岗位'; err.style.display = 'block'; return; }
   if (!selectedFile) { err.textContent = '请选择简历附件'; err.style.display = 'block'; return; }
 
@@ -270,8 +287,8 @@ async function doSubmit() {
   btn.classList.add('loading');
 
   const fd = new FormData();
-  fd.append('name', document.getElementById('name').value.trim());
-  fd.append('phone', document.getElementById('phone').value.trim());
+  fd.append('name', name);
+  fd.append('phone', phone);
   fd.append('position', selectedPosition.name);
   fd.append('position_id', selectedPosition.id);
   fd.append('school', schoolName);
@@ -299,11 +316,14 @@ function resetForm() {
   document.getElementById('formBox').style.display = 'block';
   document.getElementById('name').value = '';
   document.getElementById('phone').value = '';
+  showFieldErr('name', 'nameErr', false);
+  showFieldErr('phone', 'phoneErr', false);
   selectedPosition = null;
   document.getElementById('position').value = '';
   document.getElementById('posSelected').style.display = 'none';
   document.getElementById('fileInfo').style.display = 'none';
   document.getElementById('fileInfo').textContent = '';
+  document.getElementById('errMsg').style.display = 'none';
   input.value = '';
   selectedFile = null;
 }

@@ -251,6 +251,59 @@ def list_resumes(limit: int = 50) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def query_resumes(
+    school: str = "",
+    position: str = "",
+    keyword: str = "",
+    date: str = "",
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict]:
+    """简历列表：按 学校/岗位/关键词/日期 筛选，分页返回（含总数）。"""
+    where, params = [], []
+    if school:
+        where.append("s.name = ?")
+        params.append(school)
+    if position:
+        where.append("p.name = ?")
+        params.append(position)
+    if keyword:
+        like = f"%{keyword}%"
+        where.append("(r.name LIKE ? OR r.phone LIKE ? OR r.original LIKE ?)")
+        params += [like, like, like]
+    if date:
+        where.append("substr(r.upload_time, 1, 10) = ?")
+        params.append(date)
+    clause = (" WHERE " + " AND ".join(where)) if where else ""
+
+    conn = get_conn()
+    total = conn.execute(
+        "SELECT COUNT(*) AS c FROM resumes r "
+        "LEFT JOIN schools s ON r.school_id = s.id "
+        "LEFT JOIN positions p ON r.position_id = p.id" + clause,
+        params,
+    ).fetchone()["c"]
+    rows = conn.execute(
+        "SELECT r.*, s.name AS school_name, p.name AS position_name "
+        "FROM resumes r "
+        "LEFT JOIN schools s ON r.school_id = s.id "
+        "LEFT JOIN positions p ON r.position_id = p.id" + clause +
+        " ORDER BY r.id DESC LIMIT ? OFFSET ?",
+        params + [limit, offset],
+    ).fetchall()
+    conn.close()
+    return {"total": total, "items": [dict(r) for r in rows]}
+
+
+def delete_resume(resume_id: int) -> bool:
+    conn = get_conn()
+    cur = conn.execute("DELETE FROM resumes WHERE id=?", (resume_id,))
+    conn.commit()
+    deleted = cur.rowcount > 0
+    conn.close()
+    return deleted
+
+
 def count_resumes() -> int:
     conn = get_conn()
     n = conn.execute("SELECT COUNT(*) AS c FROM resumes").fetchone()["c"]

@@ -69,6 +69,9 @@
   th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
   th { color: #9fb8cc; font-weight: 600; font-size: 13px; }
   tr:hover td { background: rgba(255,255,255,0.04); }
+  tr.selected td { background: rgba(79,195,247,0.12); }
+  table input[type=checkbox] { width: 16px; height: 16px; accent-color: #4fc3f7; cursor: pointer; }
+  .fname-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tag {
     display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px;
     background: rgba(79,195,247,0.15); color: #81d4fa; border: 1px solid rgba(79,195,247,0.4); margin: 2px;
@@ -106,6 +109,23 @@
   }
   .toast.show { opacity: 1; }
   .toast.err { background: #c62828; }
+
+  /* 新简历到达横幅 */
+  .new-banner {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-120%);
+    background: linear-gradient(135deg, #66bb6a, #26a69a); color: #fff;
+    padding: 14px 28px; border-radius: 12px; font-size: 16px; font-weight: 700;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35); z-index: 120; transition: transform .3s;
+    display: flex; align-items: center; gap: 10px; pointer-events: none;
+  }
+  .new-banner.show { transform: translateX(-50%) translateY(0); }
+  .new-banner .pulse { width: 12px; height: 12px; border-radius: 50%; background: #fff; animation: pulse 1s infinite; }
+  @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(1.5); } 100% { opacity: 1; transform: scale(1); } }
+
+  /* 学校名大字动画 */
+  .school-big { font-size: 26px !important; transition: all .3s; }
+  @keyframes popIn { 0% { transform: scale(.8); opacity: .4; } 100% { transform: scale(1); opacity: 1; } }
+  .pop { animation: popIn .4s ease; }
   .recent { list-style: none; }
   .recent li {
     display: flex; align-items: center; gap: 12px; padding: 10px 4px;
@@ -126,6 +146,7 @@
 
   <div class="tabs">
     <div class="tab active" data-page="screen" onclick="switchPage('screen')">📺 现场大屏</div>
+    <div class="tab" data-page="resumes" onclick="switchPage('resumes')">📄 简历管理</div>
     <div class="tab" data-page="positions" onclick="switchPage('positions')">💼 岗位管理</div>
     <div class="tab" data-page="schools" onclick="switchPage('schools')">🏫 学校管理</div>
     <div class="tab" data-page="dashboard" onclick="switchPage('dashboard')">📊 数据看板</div>
@@ -167,6 +188,57 @@
           </div>
           <h2 style="margin-top:16px">最近上传</h2>
           <ul class="recent" id="recentList"><li class="empty">暂无上传记录</li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 简历管理 ============ -->
+  <div class="page" id="page-resumes">
+    <div class="card">
+      <h2>筛选</h2>
+      <div class="row" style="align-items:flex-end">
+        <div class="grow" style="flex:1 1 160px"><label>学校</label><select id="resumeSchoolFilter"><option value="">全部学校</option></select></div>
+        <div class="grow" style="flex:1 1 160px"><label>岗位</label><select id="resumePosFilter"><option value="">全部岗位</option></select></div>
+        <div class="grow" style="flex:1 1 160px"><label>日期</label><input type="date" id="resumeDateFilter"></div>
+        <div class="grow" style="flex:1 1 180px"><label>关键词</label><input type="search" id="resumeKeyword" placeholder="姓名 / 手机 / 文件名"></div>
+        <button class="btn btn-primary" onclick="applyResumeFilter()">查询</button>
+        <button class="btn btn-ghost" onclick="resetResumeFilter()">重置</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>简历列表（<span id="resumeCount">0</span>）
+        <span class="hint">勾选后可批量下载 ZIP 或删除</span>
+      </h2>
+      <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap">
+        <button class="btn btn-green btn-sm" onclick="downloadSelected()">⬇ 下载所选（ZIP）</button>
+        <button class="btn btn-green btn-sm" onclick="downloadFiltered()">⬇ 下载当前筛选全部</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleSelectAll()">全选/全不选</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSelected()">删除所选</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th style="width:36px"><input type="checkbox" id="resumeSelectAll" onchange="toggleSelectAll()"></th>
+            <th style="width:60px">ID</th>
+            <th>姓名</th>
+            <th>手机号</th>
+            <th>学校</th>
+            <th>岗位</th>
+            <th>上传时间</th>
+            <th>文件</th>
+            <th style="width:130px">操作</th>
+          </tr></thead>
+          <tbody id="resumeTbody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="resumeEmpty">暂无简历</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; flex-wrap:wrap; gap:8px">
+        <span class="muted" id="resumePageInfo"></span>
+        <div style="display:flex; gap:8px">
+          <button class="btn btn-ghost btn-sm" id="resumePrevBtn" onclick="resumePage(-1)">上一页</button>
+          <button class="btn btn-ghost btn-sm" id="resumeNextBtn" onclick="resumePage(1)">下一页</button>
         </div>
       </div>
     </div>
@@ -248,6 +320,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="new-banner" id="newBanner"><span class="pulse"></span><span id="newBannerText">新简历已上传</span></div>
 
 <script>
 let config = null;
@@ -274,6 +347,7 @@ function switchPage(name) {
   if (name === 'positions') loadPositions();
   if (name === 'schools') loadSchools();
   if (name === 'dashboard') loadDashboard();
+  if (name === 'resumes') loadResumeFilters();
 }
 
 // ============ 通用加载 ============
@@ -314,7 +388,12 @@ async function renderActiveSchoolSelect() {
 
 function updateActiveSchoolUI() {
   const name = config.active_school || '未指定学校';
-  document.getElementById('activeSchoolName').textContent = name;
+  const el = document.getElementById('activeSchoolName');
+  el.textContent = name;
+  el.classList.remove('pop');
+  void el.offsetWidth; // 重启动画
+  el.classList.add('pop');
+  el.classList.toggle('school-big', !!config.active_school);
   const url = getAccessUrl(config);
   document.getElementById('qrUrl').textContent = url;
 }
@@ -369,12 +448,42 @@ async function resetEvent() {
 }
 
 // ============ 现场大屏统计 ============
+let lastMaxId = 0;
+let newBannerTimer = null;
+
+function showNewBanner(name) {
+  document.getElementById('newBannerText').textContent = `新简历已上传：${name || ''}`;
+  const b = document.getElementById('newBanner');
+  b.classList.add('show');
+  clearTimeout(newBannerTimer);
+  newBannerTimer = setTimeout(() => b.classList.remove('show'), 3000);
+  // 提示音（现场注意开启声音）
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880; gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.start(); osc.stop(ctx.currentTime + 0.4);
+  } catch (e) {}
+}
+
 async function loadStats() {
   try {
     const r = await fetch('/api/stats');
     const d = await r.json();
     document.getElementById('statCount').textContent = d.count;
     document.getElementById('statToday').textContent = d.count;
+    // 检测新简历到达
+    if (d.recent && d.recent.length) {
+      const newMax = d.recent[0].id;
+      if (lastMaxId && newMax > lastMaxId) {
+        const newest = d.recent[0];
+        showNewBanner(newest.name || newest.original || '');
+      }
+      lastMaxId = newMax;
+    }
     const ul = document.getElementById('recentList');
     if (!d.recent || d.recent.length === 0) {
       ul.innerHTML = '<li class="empty">暂无上传记录</li>';
@@ -571,6 +680,135 @@ async function deleteSchool(id) {
   if (!r.ok) { toast('删除失败', true); return; }
   loadSchools();
   toast('已删除');
+}
+
+// ============ 简历管理 ============
+let resumePageNo = 1;
+const RESUME_PAGE_SIZE = 20;
+let resumeTotal = 0;
+
+async function loadResumeFilters() {
+  try {
+    const [sRes, pRes] = await Promise.all([fetch('/api/schools'), fetch('/api/positions')]);
+    const sList = await sRes.json();
+    const pList = await pRes.json();
+    const sSel = document.getElementById('resumeSchoolFilter');
+    const curS = sSel.value;
+    sSel.innerHTML = '<option value="">全部学校</option>' + sList.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');
+    if (curS) sSel.value = curS;
+    const pSel = document.getElementById('resumePosFilter');
+    const curP = pSel.value;
+    pSel.innerHTML = '<option value="">全部岗位</option>' + pList.map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
+    if (curP) pSel.value = curP;
+  } catch (e) {}
+  loadResumes();
+}
+
+function resumeFilterParams() {
+  const p = new URLSearchParams();
+  const s = document.getElementById('resumeSchoolFilter').value;
+  const pos = document.getElementById('resumePosFilter').value;
+  const d = document.getElementById('resumeDateFilter').value;
+  const kw = document.getElementById('resumeKeyword').value.trim();
+  if (s) p.set('school', s);
+  if (pos) p.set('position', pos);
+  if (d) p.set('date', d);
+  if (kw) p.set('keyword', kw);
+  p.set('limit', RESUME_PAGE_SIZE);
+  p.set('offset', (resumePageNo - 1) * RESUME_PAGE_SIZE);
+  return p;
+}
+
+async function loadResumes() {
+  try {
+    const r = await fetch('/api/resumes?' + resumeFilterParams());
+    const d = await r.json();
+    resumeTotal = d.total;
+    document.getElementById('resumeCount').textContent = d.total;
+    document.getElementById('resumeEmpty').style.display = d.items.length ? 'none' : 'block';
+    const tb = document.getElementById('resumeTbody');
+    tb.innerHTML = d.items.map(item => `<tr data-id="${item.id}">
+      <td><input type="checkbox" class="resume-cb" value="${item.id}" onchange="toggleResumeRow(this)"></td>
+      <td>${item.id}</td>
+      <td>${escapeHtml(item.name || '—')}</td>
+      <td>${escapeHtml(item.phone || '—')}</td>
+      <td>${escapeHtml(item.school_name || '—')}</td>
+      <td>${escapeHtml(item.position_name || item.position || '—')}</td>
+      <td>${escapeHtml(item.upload_time || '—')}</td>
+      <td class="fname-cell" title="${escapeHtml(item.original)}">${escapeHtml(item.original)}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="downloadOne(${item.id})">下载</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteOne(${item.id})">删除</button>
+      </td>
+    </tr>`).join('');
+    const totalPages = Math.max(1, Math.ceil(d.total / RESUME_PAGE_SIZE));
+    document.getElementById('resumePageInfo').textContent = `共 ${d.total} 条 · 第 ${resumePageNo}/${totalPages} 页`;
+    document.getElementById('resumePrevBtn').disabled = resumePageNo <= 1;
+    document.getElementById('resumeNextBtn').disabled = resumePageNo >= totalPages;
+  } catch (e) { toast('加载简历失败', true); }
+}
+
+function applyResumeFilter() { resumePageNo = 1; loadResumes(); }
+function resetResumeFilter() {
+  document.getElementById('resumeSchoolFilter').value = '';
+  document.getElementById('resumePosFilter').value = '';
+  document.getElementById('resumeDateFilter').value = '';
+  document.getElementById('resumeKeyword').value = '';
+  resumePageNo = 1;
+  loadResumes();
+}
+function resumePage(dir) {
+  const next = resumePageNo + dir;
+  if (next < 1) return;
+  resumePageNo = next;
+  loadResumes();
+}
+
+function toggleResumeRow(cb) {
+  cb.closest('tr').classList.toggle('selected', cb.checked);
+}
+function toggleSelectAll() {
+  const all = document.getElementById('resumeSelectAll');
+  const cbs = [...document.querySelectorAll('.resume-cb')];
+  const allChecked = cbs.every(c => c.checked);
+  cbs.forEach(c => { c.checked = !allChecked; c.closest('tr').classList.toggle('selected', !allChecked); });
+  all.checked = !allChecked;
+}
+function selectedResumeIds() {
+  return [...document.querySelectorAll('.resume-cb:checked')].map(c => c.value);
+}
+
+function downloadOne(id) {
+  window.location.href = '/api/resumes/' + id + '/download';
+}
+function downloadSelected() {
+  const ids = selectedResumeIds();
+  if (!ids.length) { toast('请先勾选简历', true); return; }
+  window.location.href = '/api/resumes/export.zip?ids=' + ids.join(',');
+}
+function downloadFiltered() {
+  const p = resumeFilterParams();
+  p.delete('limit'); p.delete('offset');
+  window.location.href = '/api/resumes/export.zip?' + p.toString();
+}
+async function deleteOne(id) {
+  if (!confirm('确定删除这条简历记录及文件？')) return;
+  const r = await fetch('/api/resumes/' + id, { method: 'DELETE' });
+  if (!r.ok) { toast('删除失败', true); return; }
+  toast('已删除');
+  loadResumes();
+}
+async function deleteSelected() {
+  const ids = selectedResumeIds();
+  if (!ids.length) { toast('请先勾选简历', true); return; }
+  if (!confirm(`确定删除所选 ${ids.length} 条简历及文件？`)) return;
+  let ok = true;
+  for (const id of ids) {
+    const r = await fetch('/api/resumes/' + id, { method: 'DELETE' });
+    if (!r.ok) ok = false;
+  }
+  toast(ok ? '已删除所选简历' : '部分删除失败', !ok);
+  loadResumes();
 }
 
 // ============ 数据看板 ============
