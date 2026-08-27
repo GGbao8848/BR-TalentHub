@@ -123,7 +123,6 @@
   @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(1.5); } 100% { opacity: 1; transform: scale(1); } }
 
   /* 学校名大字动画 */
-  .school-big { font-size: 26px !important; transition: all .3s; }
   @keyframes popIn { 0% { transform: scale(.8); opacity: .4; } 100% { transform: scale(1); opacity: 1; } }
   .pop { animation: popIn .4s ease; }
   .recent { list-style: none; }
@@ -132,9 +131,26 @@
     border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 14px;
   }
   .recent li:last-child { border-bottom: none; }
-  .recent .badge { width: 8px; height: 8px; border-radius: 50%; background: #66bb6a; flex-shrink: 0; }
-  .recent .fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .recent .meta { color: #9fb8cc; font-size: 12px; flex-shrink: 0; }
+  /* 现场大屏 - 二维码展示区 */
+  .qr-section { display: flex; gap: 28px; flex-wrap: wrap; align-items: stretch; }
+  .qr-display {
+    flex: 0 0 320px; text-align: center; display: flex; flex-direction: column;
+    align-items: center; gap: 14px; padding: 24px 20px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+  }
+  .qr-display .school-label { font-size: 13px; color: #9fb8cc; letter-spacing: 1px; }
+  .qr-display .school-name-big { font-size: 22px; font-weight: 700; color: #ffe082; min-height: 30px; }
+  .qr-display img.qr { width: 240px; height: 240px; background: #fff; padding: 12px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+  .qr-display .qr-hint { font-size: 14px; color: #b3cde0; }
+  .qr-display .qr-url { font-size: 12px; color: #7a93a8; word-break: break-all; max-width: 280px; }
+  .qr-side { flex: 1; min-width: 280px; display: flex; flex-direction: column; }
+  .school-switch-row {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 10px;
+  }
+  .school-switch-row label { margin: 0; font-size: 13px; color: #9fb8cc; flex-shrink: 0; }
+  .school-switch-row select { flex: 1; }
 </style>
 </head>
 <body>
@@ -156,32 +172,38 @@
   <div class="page active" id="page-screen">
     <div class="card">
       <h2>招聘会设置</h2>
-      <div class="row">
-        <div class="grow">
+      <div class="row" style="align-items:flex-end; gap:16px">
+        <div class="grow" style="flex:1 1 240px">
           <label>招聘会名称</label>
           <input type="text" id="eventName" placeholder="如：2026 北人招聘会">
         </div>
-        <div class="grow">
+        <div class="grow" style="flex:1 1 240px">
           <label>简历保存目录</label>
           <input type="text" id="saveDir" placeholder="如：D:\招聘会\2026">
         </div>
-        <button class="btn btn-primary" onclick="saveConfig()">保存</button>
-        <button class="btn btn-danger btn-sm" onclick="resetEvent()">开始新一场</button>
+        <button class="btn btn-primary" style="min-width:90px" onclick="saveConfig()">保 存</button>
+        <button class="btn btn-danger" style="min-width:120px" onclick="resetEvent()">开始新一场</button>
       </div>
       <div class="muted" id="saveDirHint" style="margin-top:8px"></div>
     </div>
 
     <div class="card">
       <h2>现场扫码上传</h2>
-      <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start">
-        <div style="text-align:center">
-          <div class="muted" style="margin-bottom:6px">当前招聘学校</div>
-          <div class="event-name" id="activeSchoolName" style="font-size:18px; margin-bottom:10px">—</div>
-          <select id="activeSchoolSelect" onchange="switchActiveSchool()" style="width:220px;margin-bottom:10px"></select>
-          <img id="qrImg" src="/api/qrcode?t=1" alt="二维码" style="width:220px;height:220px;background:#fff;padding:10px;border-radius:10px">
-          <div class="muted" id="qrUrl" style="margin-top:8px;max-width:280px;word-break:break-all"></div>
+      <div class="qr-section">
+        <!-- 左：二维码展示 -->
+        <div class="qr-display">
+          <div class="school-label">当前招聘学校</div>
+          <div class="school-name-big" id="activeSchoolName">-</div>
+          <img class="qr" id="qrImg" src="/api/qrcode?t=1" alt="二维码">
+          <div class="qr-hint">📱 手机扫码上传简历</div>
+          <div class="qr-url" id="qrUrl"></div>
         </div>
-        <div style="flex:1;min-width:260px">
+        <!-- 右：学校切换 + 统计 + 最近上传 -->
+        <div class="qr-side">
+          <div class="school-switch-row">
+            <label>切换学校</label>
+            <select id="activeSchoolSelect" onchange="switchActiveSchool()"></select>
+          </div>
           <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:0">
             <div class="stat"><div class="num" id="statCount">0</div><div class="lbl">已收简历</div></div>
             <div class="stat"><div class="num" id="statToday">0</div><div class="lbl">本场新增</div></div>
@@ -394,7 +416,6 @@ function updateActiveSchoolUI() {
   el.classList.remove('pop');
   void el.offsetWidth; // 重启动画
   el.classList.add('pop');
-  el.classList.toggle('school-big', !!config.active_school);
   const url = getAccessUrl(config);
   document.getElementById('qrUrl').textContent = url;
 }
